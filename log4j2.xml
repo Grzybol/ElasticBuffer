@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration status="warn">
+    <Appenders>
+        <Http name="HttpAppender" url="http://localhost:9200/betterquests/_doc">
+            <JsonLayout properties="true" compact="true" eventEol="true">
+                <KeyValuePair key="indexName" value="skygen-bettergen"/>
+            </JsonLayout>
+        </Http>
+        <Console name="Console" target="SYSTEM_OUT">
+            <PatternLayout pattern="%d{yyyy-MM-dd HH:mm:ss} [%t] %-5level %logger{36} - %msg%n"/>
+        </Console>
+    </Appenders>
+    <Loggers>
+        <Root level="info">
+            <AppenderRef ref="Console"/>
+            <AppenderRef ref="HttpAppender"/>
+        </Root>
+    </Loggers>
+</Configuration>
