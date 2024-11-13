@@ -20,6 +20,7 @@ public class ElasticBuffer extends JavaPlugin {
     public ElasticBufferAPI api;
     private ElasticBufferPluginLogger elasticBufferPluginLogger;
     ElasticBufferConfigManager elasticBufferConfigManager;
+
     @Override
     public void onEnable() {
         Bukkit.getServicesManager().register(ElasticBuffer.class, this, this, ServicePriority.Normal);
@@ -46,22 +47,6 @@ public class ElasticBuffer extends JavaPlugin {
             elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.ERROR, "bufferPlugin3: null, exception "+e.getMessage());
         }
 
-
-        /*
-        // Uzyskaj instancję ElasticBuffer z PluginManager
-        Plugin plugin = Bukkit.getPluginManager().getPlugin("ElasticBuffer");
-        if (plugin instanceof ElasticBuffer) {
-            bufferPlugin = (ElasticBuffer) plugin;
-            elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.INFO, "ElasticBuffer instance found via PluginManager");
-            api.log("bufferPlugin test log", "INFO", bufferPlugin.getDescription().getName());
-        } else {
-            elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.ERROR, "ElasticBuffer instance is null via PluginManager");
-        }
-
-        sendLogs();
-
-         */
-
     }
 
     @Override
@@ -80,9 +65,9 @@ public class ElasticBuffer extends JavaPlugin {
 
 
     public void receiveLog(String log, String level, String pluginName) {
-        logBuffer.add(log, level, pluginName);
+        long logTimestamp = System.currentTimeMillis();
+        logBuffer.add(log, level, pluginName,logTimestamp);
         elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.DEBUG, "Received log: " + log+", pluginName: "+pluginName+". level: "+level);
-        logBuffer.add(log, level, pluginName);
     }
 
     public void sendLogs() {
@@ -110,10 +95,11 @@ public class ElasticBuffer extends JavaPlugin {
             for (LogEntry logEntry : logsToSend) {
                 // Linia metadanych dla akcji index
                 ndjsonBuilder.append("{\"index\":{}}\n");
-                // Dane logu
+                // Dane logu z timestampem zapisanym w momencie odbioru
                 ndjsonBuilder.append(String.format(
-                        "{\"timestamp\":\"%s\",\"level\":\"%s\",\"message\":\"%s\"}\n",
-                        java.time.format.DateTimeFormatter.ISO_INSTANT.format(java.time.Instant.now()),
+                        "{\"timestamp\":\"%s\",\"plugin\":\"%s\",\"level\":\"%s\",\"message\":\"%s\"}\n",
+                        java.time.format.DateTimeFormatter.ISO_INSTANT.format(java.time.Instant.ofEpochMilli(logEntry.getTimestamp())),
+                        logEntry.getPluginName(),
                         logEntry.getLevel(),
                         logEntry.getMessage()
                 ));
