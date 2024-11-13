@@ -11,7 +11,7 @@ import java.util.Arrays;
 import java.util.Date;
 import java.util.Set;
 
-public class PluginLogger {
+public class ElasticBufferPluginLogger {
 
     private final File logFile;
     private JavaPlugin plugin;
@@ -22,7 +22,7 @@ public class PluginLogger {
         INFO, WARNING, ERROR,CUSTOM_MOBS, DEBUG, DEBUG_LVL2, DEBUG_LVL3,DEBUG_LVL4,CHEATERS, RANKING_REWARDS ,FLAMETHROWER,DROP,SPAWNERS, ZEPHYR, KILL_EVENT, COMMAND, PLACEHOLDER, BLOCK_BREAK, BLOCK_PLACE, PLAYER_INTERACT, ELYTRA_CHECK, ANTYWEB, REROLL
     }
 
-    public PluginLogger(String folderPath, Set<LogLevel> enabledLogLevels, JavaPlugin plugin) {
+    public ElasticBufferPluginLogger(String folderPath, Set<LogLevel> enabledLogLevels, JavaPlugin plugin) {
         this.enabledLogLevels = enabledLogLevels;
         this.plugin = plugin;
         // Tworzenie folderu dla logów, jeśli nie istnieje

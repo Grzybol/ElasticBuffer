@@ -1,6 +1,7 @@
 package org.betterbox.elasticBuffer;
 
 import org.bukkit.Bukkit;
+import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.ServicePriority;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -15,25 +16,51 @@ import java.util.Set;
 public class ElasticBuffer extends JavaPlugin {
     private LogBuffer logBuffer;
     private final int interval = 1200; // 60 seconds * 20 TPS
-    private static ElasticBuffer instance;
-    private PluginLogger pluginLogger;
-    ConfigManager configManager;
+    //private ElasticBuffer bufferPlugin;
+    public ElasticBufferAPI api;
+    private ElasticBufferPluginLogger elasticBufferPluginLogger;
+    ElasticBufferConfigManager elasticBufferConfigManager;
     @Override
     public void onEnable() {
+        Bukkit.getServicesManager().register(ElasticBuffer.class, this, this, ServicePriority.Normal);
+        api = new ElasticBufferAPI(this);
+        Bukkit.getServicesManager().register(ElasticBufferAPI.class, api, this, ServicePriority.Normal);
+
         File dataFolder = getDataFolder();
         if (!dataFolder.exists()) {
             dataFolder.mkdirs();
         }
-        Set<PluginLogger.LogLevel> defaultLogLevels = EnumSet.of(PluginLogger.LogLevel.INFO, PluginLogger.LogLevel.WARNING, PluginLogger.LogLevel.ERROR);
-        pluginLogger = new PluginLogger(getDataFolder().getAbsolutePath(), defaultLogLevels,this);
-        configManager = new ConfigManager(this, pluginLogger, getDataFolder().getAbsolutePath());
-        instance = this;
+        Set<ElasticBufferPluginLogger.LogLevel> defaultLogLevels = EnumSet.of(ElasticBufferPluginLogger.LogLevel.INFO, ElasticBufferPluginLogger.LogLevel.WARNING, ElasticBufferPluginLogger.LogLevel.ERROR);
+        elasticBufferPluginLogger = new ElasticBufferPluginLogger(getDataFolder().getAbsolutePath(), defaultLogLevels,this);
+        elasticBufferConfigManager = new ElasticBufferConfigManager(this, elasticBufferPluginLogger, getDataFolder().getAbsolutePath());
         logBuffer = new LogBuffer();
         getServer().getScheduler().runTaskTimerAsynchronously(this, this::sendLogs, interval, interval);
-        Bukkit.getServicesManager().register(ElasticBuffer.class, this, this, ServicePriority.Normal);
-        pluginLogger.log(PluginLogger.LogLevel.INFO, "ElasticBuffer loaded, testing kibana connection");
-        ElasticBufferAPI.getInstance().log("ElasticBuffer loaded, testing kibana connection","INFO","ElasticBuffer");
+        elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.INFO, "ElasticBufferAPI registered with ServicesManager");
+        try{
+        ElasticBuffer bufferPlugin3 = Bukkit.getServicesManager().load(ElasticBuffer.class);
+        elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.INFO, "bufferPlugin3: "+bufferPlugin3);
+        assert bufferPlugin3 != null;
+        bufferPlugin3.receiveLog("ElasticBuffer initialized successfully!", "INFO", "ElasticBuffer");
+        bufferPlugin3.sendLogs();
+        }catch (Exception e){
+            elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.ERROR, "bufferPlugin3: null, exception "+e.getMessage());
+        }
+
+
+        /*
+        // Uzyskaj instancję ElasticBuffer z PluginManager
+        Plugin plugin = Bukkit.getPluginManager().getPlugin("ElasticBuffer");
+        if (plugin instanceof ElasticBuffer) {
+            bufferPlugin = (ElasticBuffer) plugin;
+            elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.INFO, "ElasticBuffer instance found via PluginManager");
+            api.log("bufferPlugin test log", "INFO", bufferPlugin.getDescription().getName());
+        } else {
+            elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.ERROR, "ElasticBuffer instance is null via PluginManager");
+        }
+
         sendLogs();
+
+         */
 
     }
 
@@ -42,19 +69,25 @@ public class ElasticBuffer extends JavaPlugin {
 
     }
     public static ElasticBuffer getInstance() {
-        return instance;
+        Plugin plugin = Bukkit.getPluginManager().getPlugin("ElasticBuffer");
+        if (plugin instanceof ElasticBuffer) {
+            return (ElasticBuffer) plugin;
+        }
+        return null; // Zwróć null, jeśli instancja nie jest dostępna
     }
+
 
 
 
     public void receiveLog(String log, String level, String pluginName) {
         logBuffer.add(log, level, pluginName);
-        pluginLogger.log(PluginLogger.LogLevel.DEBUG, "Received log: " + log+", pluginName: "+pluginName+". level: "+level);
+        elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.DEBUG, "Received log: " + log+", pluginName: "+pluginName+". level: "+level);
         logBuffer.add(log, level, pluginName);
     }
 
     public void sendLogs() {
-        pluginLogger.log(PluginLogger.LogLevel.DEBUG, "sendLogs() called");
+        elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.DEBUG, "sendLogs() called");
+        api.log("sendLogs() called", "DEBUG", "ElasticBuffer");
         List<LogEntry> logsToSend = logBuffer.getAndClear();
 
         // Jeśli bufor jest pusty, nie ma nic do wysłania
@@ -91,7 +124,7 @@ public class ElasticBuffer extends JavaPlugin {
                 String ndjsonContent = ndjsonBuilder.toString();
                 byte[] input = ndjsonBuilder.toString().getBytes(StandardCharsets.UTF_8);
                 os.write(input, 0, input.length);
-                pluginLogger.log(PluginLogger.LogLevel.DEBUG, "Sending NDJSON: " + ndjsonContent);
+                elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.DEBUG, "Sending NDJSON: " + ndjsonContent);
             }
 
             int responseCode = connection.getResponseCode();
@@ -100,18 +133,18 @@ public class ElasticBuffer extends JavaPlugin {
                         new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8))) {
                     String responseLine;
                     while ((responseLine = reader.readLine()) != null) {
-                        pluginLogger.log(PluginLogger.LogLevel.DEBUG, "Elasticsearch response: "+responseLine);
+                        elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.DEBUG, "Elasticsearch response: "+responseLine);
                     }
                 }
                 getLogger().info("Logs successfully sent to Elasticsearch");
-                pluginLogger.log(PluginLogger.LogLevel.INFO, "Logs successfully sent to Elasticsearch");
+                elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.INFO, "Logs successfully sent to Elasticsearch");
             } else {
                 getLogger().warning("Failed to send logs to Elasticsearch: HTTP " + responseCode);
-                pluginLogger.log(PluginLogger.LogLevel.ERROR, "Failed to send logs to Elasticsearch: HTTP " + responseCode);
+                elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.ERROR, "Failed to send logs to Elasticsearch: HTTP " + responseCode);
             }
         } catch (Exception e) {
             getLogger().severe("Error sending logs to Elasticsearch: " + e.getMessage());
-            pluginLogger.log(PluginLogger.LogLevel.ERROR, "Error sending logs to Elasticsearch: " + e.getMessage());
+            elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.ERROR, "Error sending logs to Elasticsearch: " + e.getMessage());
         }
     }
 

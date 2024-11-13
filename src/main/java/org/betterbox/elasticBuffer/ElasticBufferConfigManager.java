@@ -9,23 +9,23 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.*;
 
-public class ConfigManager {
+public class ElasticBufferConfigManager {
     private JavaPlugin plugin;
-    private final PluginLogger pluginLogger;
+    private final ElasticBufferPluginLogger elasticBufferPluginLogger;
     private File configFile = null;
     List<String> logLevels = null;
-    Set<PluginLogger.LogLevel> enabledLogLevels;
+    Set<ElasticBufferPluginLogger.LogLevel> enabledLogLevels;
     private Map<Integer, String> rankHierarchy;
 
-    public ConfigManager(JavaPlugin plugin, PluginLogger pluginLogger, String folderPath) {
+    public ElasticBufferConfigManager(JavaPlugin plugin, ElasticBufferPluginLogger elasticBufferPluginLogger, String folderPath) {
 
         this.plugin = plugin;
-        this.pluginLogger = pluginLogger;
+        this.elasticBufferPluginLogger = elasticBufferPluginLogger;
         this.rankHierarchy = new LinkedHashMap<>();
-        pluginLogger.log(PluginLogger.LogLevel.DEBUG,"ConfigManager called");
-        pluginLogger.log(PluginLogger.LogLevel.DEBUG,"ConfigManager: calling configureLogger");
+        elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.DEBUG,"ConfigManager called");
+        elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.DEBUG,"ConfigManager: calling configureLogger");
         configureLogger();
-        CreateExampleConfigFile(folderPath);
+        //CreateExampleConfigFile(folderPath);
     }
     private void CreateExampleConfigFile(String folderPath){
         File exampleConfigFile = new File(folderPath, "config.yml");
@@ -41,10 +41,10 @@ public class ConfigManager {
     }
 
     private void configureLogger() {
-        pluginLogger.log(PluginLogger.LogLevel.DEBUG,"ConfigManager: configureLogger called");
+        elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.DEBUG,"ConfigManager: configureLogger called");
         configFile = new File(plugin.getDataFolder(), "config.yml");
         if (!configFile.exists()) {
-            pluginLogger.log(PluginLogger.LogLevel.WARNING, "Config file does not exist, creating new one.");
+            elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.WARNING, "Config file does not exist, creating new one.");
             try {
                 configFile.createNewFile();
                 updateConfig("log_level:\n  - INFO\n  - WARNING\n  - ERROR");
@@ -55,42 +55,42 @@ public class ConfigManager {
         ReloadConfig();
     }
     public void ReloadConfig(){
-        pluginLogger.log(PluginLogger.LogLevel.DEBUG,"ConfigManager: ReloadConfig called");
+        elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.DEBUG,"ConfigManager: ReloadConfig called");
         // Odczytanie ustawień log_level z pliku konfiguracyjnego
         configFile = new File(plugin.getDataFolder(), "config.yml");
         plugin.reloadConfig();
         logLevels = plugin.getConfig().getStringList("log_level");
         enabledLogLevels = new HashSet<>();
         if (logLevels == null || logLevels.isEmpty()) {
-            pluginLogger.log(PluginLogger.LogLevel.ERROR,"ConfigManager: ReloadConfig: no config file or no configured log levels! Saving default settings.");
+            elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.ERROR,"ConfigManager: ReloadConfig: no config file or no configured log levels! Saving default settings.");
             // Jeśli konfiguracja nie określa poziomów logowania, użyj domyślnych ustawień
-            enabledLogLevels = EnumSet.of(PluginLogger.LogLevel.INFO, PluginLogger.LogLevel.WARNING, PluginLogger.LogLevel.ERROR);
+            enabledLogLevels = EnumSet.of(ElasticBufferPluginLogger.LogLevel.INFO, ElasticBufferPluginLogger.LogLevel.WARNING, ElasticBufferPluginLogger.LogLevel.ERROR);
             updateConfig("log_level:\n  - INFO\n  - WARNING\n  - ERROR");
 
         }
 
         for (String level : logLevels) {
             try {
-                pluginLogger.log(PluginLogger.LogLevel.DEBUG_LVL2,"ConfigManager: ReloadConfig: adding "+level.toUpperCase());
-                enabledLogLevels.add(PluginLogger.LogLevel.valueOf(level.toUpperCase()));
-                pluginLogger.log(PluginLogger.LogLevel.DEBUG_LVL2,"ConfigManager: ReloadConfig: current log levels: "+ Arrays.toString(enabledLogLevels.toArray()));
+                elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.DEBUG_LVL2,"ConfigManager: ReloadConfig: adding "+level.toUpperCase());
+                enabledLogLevels.add(ElasticBufferPluginLogger.LogLevel.valueOf(level.toUpperCase()));
+                elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.DEBUG_LVL2,"ConfigManager: ReloadConfig: current log levels: "+ Arrays.toString(enabledLogLevels.toArray()));
 
             } catch (IllegalArgumentException e) {
                 // Jeśli podano nieprawidłowy poziom logowania, zaloguj błąd
                 plugin.getServer().getLogger().warning("Invalid log level in config: " + level);
             }
         }
-        pluginLogger.log(PluginLogger.LogLevel.DEBUG,"ConfigManager: ReloadConfig: calling pluginLogger.setEnabledLogLevels(enabledLogLevels) with parameters: "+ Arrays.toString(enabledLogLevels.toArray()));
+        elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.DEBUG,"ConfigManager: ReloadConfig: calling pluginLogger.setEnabledLogLevels(enabledLogLevels) with parameters: "+ Arrays.toString(enabledLogLevels.toArray()));
 
         // Ustawienie aktywnych poziomów logowania w loggerze
-        pluginLogger.setEnabledLogLevels(enabledLogLevels);
+        elasticBufferPluginLogger.setEnabledLogLevels(enabledLogLevels);
     }
     public Map<Integer, String> getRankHierarchy() {
-        pluginLogger.log(PluginLogger.LogLevel.DEBUG, "ConfigManager: getRankHierarchy called");
+        elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.DEBUG, "ConfigManager: getRankHierarchy called");
         return rankHierarchy;
     }
     public void updateConfig(String configuration) {
-        pluginLogger.log(PluginLogger.LogLevel.DEBUG, "ConfigManager: updateConfig called with parameters "+ configuration);
+        elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.DEBUG, "ConfigManager: updateConfig called with parameters "+ configuration);
         try {
             List<String> lines = Files.readAllLines(Paths.get(configFile.toURI()));
 
@@ -101,9 +101,9 @@ public class ConfigManager {
             // ...
 
             Files.write(Paths.get(configFile.toURI()), lines);
-            pluginLogger.log(PluginLogger.LogLevel.INFO, "Config file updated successfully.");
+            elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.INFO, "Config file updated successfully.");
         } catch (IOException e) {
-            pluginLogger.log(PluginLogger.LogLevel.ERROR, "Error while updating config file: " + e.getMessage());
+            elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.ERROR, "Error while updating config file: " + e.getMessage());
         }
     }
 }
