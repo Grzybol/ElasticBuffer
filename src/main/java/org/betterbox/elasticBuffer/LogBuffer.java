@@ -15,8 +15,8 @@ public class LogBuffer {
      * @param log Treść logu do dodania.
      * @param level Poziom logowania.
      */
-    public synchronized void add(String log, String level, String pluginName, long timestamp) {
-        buffer.add(new LogEntry(log, level, pluginName, timestamp));
+    public synchronized void add(String log, String level, String pluginName, long timestamp,String transactionID) {
+        buffer.add(new LogEntry(log, level, pluginName, timestamp,transactionID));
     }
 
     /**

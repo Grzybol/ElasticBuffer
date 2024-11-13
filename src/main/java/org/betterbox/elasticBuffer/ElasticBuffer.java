@@ -41,7 +41,7 @@ public class ElasticBuffer extends JavaPlugin {
         ElasticBuffer bufferPlugin3 = Bukkit.getServicesManager().load(ElasticBuffer.class);
         elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.INFO, "bufferPlugin3: "+bufferPlugin3);
         assert bufferPlugin3 != null;
-        bufferPlugin3.receiveLog("ElasticBuffer initialized successfully!", "INFO", "ElasticBuffer");
+        bufferPlugin3.receiveLog("ElasticBuffer initialized successfully!", "INFO", "ElasticBuffer",null);
         bufferPlugin3.sendLogs();
         }catch (Exception e){
             elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.ERROR, "bufferPlugin3: null, exception "+e.getMessage());
@@ -64,15 +64,15 @@ public class ElasticBuffer extends JavaPlugin {
 
 
 
-    public void receiveLog(String log, String level, String pluginName) {
+    public void receiveLog(String log, String level, String pluginName,String transactionID) {
         long logTimestamp = System.currentTimeMillis();
-        logBuffer.add(log, level, pluginName,logTimestamp);
+        logBuffer.add(log, level, pluginName,logTimestamp,transactionID);
         elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.DEBUG, "Received log: " + log+", pluginName: "+pluginName+". level: "+level);
     }
 
     public void sendLogs() {
         elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.DEBUG, "sendLogs() called");
-        api.log("sendLogs() called", "DEBUG", "ElasticBuffer");
+        api.log("sendLogs() called", "DEBUG", "ElasticBuffer",null);
         List<LogEntry> logsToSend = logBuffer.getAndClear();
 
         // Jeśli bufor jest pusty, nie ma nic do wysłania
@@ -97,9 +97,10 @@ public class ElasticBuffer extends JavaPlugin {
                 ndjsonBuilder.append("{\"index\":{}}\n");
                 // Dane logu z timestampem zapisanym w momencie odbioru
                 ndjsonBuilder.append(String.format(
-                        "{\"timestamp\":\"%s\",\"plugin\":\"%s\",\"level\":\"%s\",\"message\":\"%s\"}\n",
+                        "{\"timestamp\":\"%s\",\"plugin\":\"%s\",\"transactionID\":\"%s\",\"level\":\"%s\",\"message\":\"%s\"}\n",
                         java.time.format.DateTimeFormatter.ISO_INSTANT.format(java.time.Instant.ofEpochMilli(logEntry.getTimestamp())),
                         logEntry.getPluginName(),
+                        logEntry.getTransactionID(),
                         logEntry.getLevel(),
                         logEntry.getMessage()
                 ));

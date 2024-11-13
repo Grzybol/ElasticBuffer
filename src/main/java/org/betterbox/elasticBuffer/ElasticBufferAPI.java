@@ -10,9 +10,9 @@ public class ElasticBufferAPI {
         this.elasticBuffer = elasticBuffer;
     }
 
-    public void log(String message, String level, String pluginName) {
+    public void log(String message, String level, String pluginName, String transactionID) {
         if (elasticBuffer != null) {
-            elasticBuffer.receiveLog(message, level, pluginName);
+            elasticBuffer.receiveLog(message, level, pluginName,transactionID);
         }
     }
 }

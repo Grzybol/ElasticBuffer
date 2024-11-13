@@ -5,12 +5,14 @@ public class LogEntry {
     private final String level;
     private final String pluginName;
     private final long timestamp;
+    private final String transactionID;
 
-    public LogEntry(String message, String level,String pluginName, long timestamp) {
+    public LogEntry(String message, String level,String pluginName, long timestamp,String transactionID) {
         this.message = message;
         this.level = level;
         this.timestamp = timestamp;
         this.pluginName = pluginName;
+        this.transactionID = (transactionID != null) ? transactionID : "N/A";
     }
 
     public String getMessage() {
@@ -18,6 +20,9 @@ public class LogEntry {
     }
     public String getPluginName() {
         return pluginName;
+    }
+    public String getTransactionID() {
+        return transactionID;
     }
 
     public String getLevel() {
