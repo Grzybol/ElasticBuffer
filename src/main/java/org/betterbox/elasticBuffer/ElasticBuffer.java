@@ -38,11 +38,11 @@ public class ElasticBuffer extends JavaPlugin {
         getServer().getScheduler().runTaskTimerAsynchronously(this, this::sendLogs, interval, interval);
         elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.INFO, "ElasticBufferAPI registered with ServicesManager");
         try{
-        ElasticBuffer bufferPlugin3 = Bukkit.getServicesManager().load(ElasticBuffer.class);
-        elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.INFO, "bufferPlugin3: "+bufferPlugin3);
-        assert bufferPlugin3 != null;
-        bufferPlugin3.receiveLog("ElasticBuffer initialized successfully!", "INFO", "ElasticBuffer",null);
-        bufferPlugin3.sendLogs();
+        ElasticBuffer bufferPlugin = Bukkit.getServicesManager().load(ElasticBuffer.class);
+        elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.INFO, "bufferPlugin3: "+bufferPlugin);
+        assert bufferPlugin != null;
+        bufferPlugin.receiveLog("ElasticBuffer initialized successfully!", "INFO", "ElasticBuffer",null);
+        bufferPlugin.sendLogs();
         }catch (Exception e){
             elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.ERROR, "bufferPlugin3: null, exception "+e.getMessage());
         }
@@ -71,24 +71,44 @@ public class ElasticBuffer extends JavaPlugin {
     }
 
     public void sendLogs() {
+        String urlString;
+        String webhookUrl;
+        int port;
+        String indexPattern;
+        String apiKey = null;
+        if(elasticBufferConfigManager.isLocal()){
+            urlString = "http://localhost:9200/betterbox/_bulk";
+        }else{
+            webhookUrl = elasticBufferConfigManager.getWebhookURL();
+             port = elasticBufferConfigManager.getPort();
+             indexPattern = elasticBufferConfigManager.getIndexPattern();
+             apiKey = elasticBufferConfigManager.getApiKey();
+            urlString = webhookUrl + ":" + port + "/" + indexPattern + "/_bulk";
+            if (elasticBufferConfigManager.isUseSSL()) {
+                try {
+                    System.setProperty("javax.net.ssl.trustStore", elasticBufferConfigManager.getTruststorePath());
+                    System.setProperty("javax.net.ssl.trustStorePassword", elasticBufferConfigManager.getTruststorePassword());
+                    elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.INFO, "SSL properties set for Elasticsearch connection.");
+                } catch (Exception e) {
+                    elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.ERROR, "Failed to set SSL properties: " + e.getMessage());
+                    return;
+                }
+            }
+        }
         elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.DEBUG, "sendLogs() called");
         api.log("sendLogs() called", "DEBUG", "ElasticBuffer",null);
         List<LogEntry> logsToSend = logBuffer.getAndClear();
 
-        // Jeśli bufor jest pusty, nie ma nic do wysłania
-        /*
-        if (logsToSend.isEmpty()) {
-            return;
-        }
-
-         */
-
         try {
-            URL url = new URL("http://localhost:9200/betterbox/_bulk");
+            URL url = new URL(urlString);
             HttpURLConnection connection = (HttpURLConnection) url.openConnection();
             connection.setRequestMethod("POST");
             connection.setRequestProperty("Content-Type", "application/x-ndjson; charset=UTF-8");
+            if(!elasticBufferConfigManager.isLocal()){
+                connection.setRequestProperty("Authorization", "ApiKey " + apiKey);
+            }
             connection.setDoOutput(true);
+
 
             // Tworzymy NDJSON (newline-delimited JSON) dla operacji bulk
             StringBuilder ndjsonBuilder = new StringBuilder();
@@ -134,5 +154,6 @@ public class ElasticBuffer extends JavaPlugin {
             elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.ERROR, "Error sending logs to Elasticsearch: " + e.getMessage());
         }
     }
+
 
 }
