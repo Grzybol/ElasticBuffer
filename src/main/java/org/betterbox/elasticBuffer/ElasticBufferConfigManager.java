@@ -16,6 +16,11 @@ public class ElasticBufferConfigManager {
     List<String> logLevels = null;
     Set<ElasticBufferPluginLogger.LogLevel> enabledLogLevels;
     private Map<Integer, String> rankHierarchy;
+    public int port;
+    private String webhookURL,apiKey,indexPattern;
+    private String truststorePath, truststorePassword;
+    private boolean useSSL,local=true;
+
 
     public ElasticBufferConfigManager(JavaPlugin plugin, ElasticBufferPluginLogger elasticBufferPluginLogger, String folderPath) {
 
@@ -45,12 +50,8 @@ public class ElasticBufferConfigManager {
         configFile = new File(plugin.getDataFolder(), "config.yml");
         if (!configFile.exists()) {
             elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.WARNING, "Config file does not exist, creating new one.");
-            try {
-                configFile.createNewFile();
-                updateConfig("log_level:\n  - INFO\n  - WARNING\n  - ERROR");
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
+            CreateExampleConfigFile(plugin.getDataFolder().toString());
+            updateConfig("log_level:\n  - INFO\n  - WARNING\n  - ERROR");
         }
         ReloadConfig();
     }
@@ -82,12 +83,169 @@ public class ElasticBufferConfigManager {
         }
         elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.DEBUG,"ConfigManager: ReloadConfig: calling pluginLogger.setEnabledLogLevels(enabledLogLevels) with parameters: "+ Arrays.toString(enabledLogLevels.toArray()));
 
+
+
+
         // Ustawienie aktywnych poziomów logowania w loggerze
         elasticBufferPluginLogger.setEnabledLogLevels(enabledLogLevels);
-    }
-    public Map<Integer, String> getRankHierarchy() {
-        elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.DEBUG, "ConfigManager: getRankHierarchy called");
-        return rankHierarchy;
+        /*
+            URL url = new URL("http://localhost:9200/betterbox/_bulk");
+            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+            connection.setRequestMethod("POST");
+            connection.setRequestProperty("Content-Type", "application/x-ndjson; charset=UTF-8");
+            connection.setDoOutput(true);
+         */
+
+        port = plugin.getConfig().getInt("elasticsearch_port");
+        if (plugin.getConfig().contains("elasticsearch_port")){
+            if (plugin.getConfig().isInt("elasticsearch_port")){
+                port = plugin.getConfig().getInt("elasticsearch_port");
+            }
+            else {
+                elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.WARNING, "ConfigManager: ReloadConfig: elasticsearch_port incorrect! Restoring default");
+                plugin.getConfig().set("elasticsearch_port", 9200);
+                plugin.saveConfig();
+            }
+        }
+        else{
+            elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.WARNING, "ConfigManager: ReloadConfig: elasticsearch_port section not found in config! Creating new section..");
+            plugin.getConfig().createSection("elasticsearch_port");
+            plugin.getConfig().set("elasticsearch_port", 9200);
+            plugin.saveConfig();
+        }
+
+        webhookURL = plugin.getConfig().getString("webhookURL");
+        if (plugin.getConfig().contains("webhookURL")){
+            if (plugin.getConfig().isString("webhookURL")){
+                webhookURL = plugin.getConfig().getString("webhookURL");
+            }
+            else {
+                elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.WARNING, "ConfigManager: ReloadConfig: webhookURL incorrect! Restoring default");
+                plugin.getConfig().set("webhookURL", "localhost");
+                plugin.saveConfig();
+            }
+        }
+        else{
+            elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.WARNING, "ConfigManager: ReloadConfig: webhookURL section not found in config! Creating new section..");
+            plugin.getConfig().createSection("webhookURL");
+            plugin.getConfig().set("webhookURL", "localhost");
+            plugin.saveConfig();
+        }
+
+        apiKey = plugin.getConfig().getString("apiKey");
+        if (plugin.getConfig().contains("apiKey")){
+            if (plugin.getConfig().isString("apiKey")){
+                apiKey = plugin.getConfig().getString("apiKey");
+            }
+            else {
+                elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.WARNING, "ConfigManager: ReloadConfig: apiKey incorrect! Restoring default");
+                plugin.getConfig().set("apiKey", "");
+                plugin.saveConfig();
+            }
+        }
+        else{
+            elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.WARNING, "ConfigManager: ReloadConfig: apiKey section not found in config! Creating new section..");
+            plugin.getConfig().createSection("apiKey");
+            plugin.getConfig().set("apiKey", "");
+            plugin.saveConfig();
+        }
+
+        indexPattern = plugin.getConfig().getString("index_pattern");
+        if (plugin.getConfig().contains("index_pattern")){
+            if (plugin.getConfig().isString("index_pattern")){
+                indexPattern = plugin.getConfig().getString("index_pattern");
+            }
+            else {
+                elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.WARNING, "ConfigManager: ReloadConfig: index_pattern incorrect! Restoring default");
+                plugin.getConfig().set("index_pattern", "YourServerName");
+                plugin.saveConfig();
+            }
+        }
+        else{
+            elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.WARNING, "ConfigManager: ReloadConfig: index_pattern section not found in config! Creating new section..");
+            plugin.getConfig().createSection("index_pattern");
+            plugin.getConfig().set("index_pattern", "YourServerName");
+            plugin.saveConfig();
+        }
+
+        local = plugin.getConfig().getBoolean("local");
+        if (plugin.getConfig().contains("local")){
+            if (plugin.getConfig().isBoolean("local")){
+                local = plugin.getConfig().getBoolean("local", true);
+            }
+            else {
+                elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.WARNING, "ConfigManager: ReloadConfig: local incorrect! Restoring default");
+                plugin.getConfig().set("local", true);
+                plugin.saveConfig();
+            }
+        }
+        else{
+            elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.WARNING, "ConfigManager: ReloadConfig: local section not found in config! Creating new section..");
+            plugin.getConfig().createSection("local");
+            plugin.getConfig().set("local", true);
+            plugin.saveConfig();
+        }
+
+        useSSL = plugin.getConfig().getBoolean("use_ssl");
+        if (plugin.getConfig().contains("use_ssl")){
+            if (plugin.getConfig().isBoolean("use_ssl")){
+                useSSL = plugin.getConfig().getBoolean("use_ssl", false);
+            }
+            else {
+                elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.WARNING, "ConfigManager: ReloadConfig: use_ssl incorrect! Restoring default");
+                plugin.getConfig().set("use_ssl", false);
+                plugin.saveConfig();
+            }
+        }
+        else{
+            elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.WARNING, "ConfigManager: ReloadConfig: use_ssl section not found in config! Creating new section..");
+            plugin.getConfig().createSection("use_ssl");
+            plugin.getConfig().set("use_ssl", false);
+            plugin.saveConfig();
+        }
+
+        truststorePath = plugin.getConfig().getString("truststore_path");
+        if (plugin.getConfig().contains("truststore_path")){
+            if (plugin.getConfig().isString("truststore_path")){
+                truststorePath = plugin.getConfig().getString("truststore_path");
+            }
+            else {
+                elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.WARNING, "ConfigManager: ReloadConfig: truststore_path incorrect! Restoring default");
+                plugin.getConfig().set("truststore_path", "truststorePath");
+                plugin.saveConfig();
+            }
+        }
+        else{
+            elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.WARNING, "ConfigManager: ReloadConfig: truststore_path section not found in config! Creating new section..");
+            plugin.getConfig().createSection("truststore_path");
+            plugin.getConfig().set("truststore_path", "truststorePath");
+            plugin.saveConfig();
+        }
+
+        truststorePassword = plugin.getConfig().getString("truststore_password");
+        if (plugin.getConfig().contains("truststore_password")){
+            if (plugin.getConfig().isString("truststore_password")){
+                truststorePassword = plugin.getConfig().getString("truststore_password");
+            }
+            else {
+                elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.WARNING, "ConfigManager: ReloadConfig: truststore_password incorrect! Restoring default");
+                plugin.getConfig().set("truststore_password", "truststore_password");
+                plugin.saveConfig();
+            }
+        }
+        else{
+            elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.WARNING, "ConfigManager: ReloadConfig: truststore_password section not found in config! Creating new section..");
+            plugin.getConfig().createSection("truststore_password");
+            plugin.getConfig().set("truststore_password", "truststore_password");
+            plugin.saveConfig();
+        }
+
+        truststorePassword = plugin.getConfig().getString("truststore_password");
+        // Logowanie konfiguracji dla debugowania
+        elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.DEBUG, "ConfigManager: ReloadConfig: useSSL: " + useSSL);
+
+
+
     }
     public void updateConfig(String configuration) {
         elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.DEBUG, "ConfigManager: updateConfig called with parameters "+ configuration);
@@ -105,6 +263,36 @@ public class ElasticBufferConfigManager {
         } catch (IOException e) {
             elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.ERROR, "Error while updating config file: " + e.getMessage());
         }
+    }
+
+    public String getApiKey() {
+        return apiKey;
+    }
+
+    public int getPort() {
+        return port;
+    }
+
+    public String getWebhookURL() {
+        return webhookURL;
+    }
+
+    public String getIndexPattern() {
+        return indexPattern;
+    }
+    public boolean isUseSSL() {
+        return useSSL;
+    }
+
+    public String getTruststorePath() {
+        return truststorePath;
+    }
+
+    public String getTruststorePassword() {
+        return truststorePassword;
+    }
+    public boolean isLocal(){
+        return local;
     }
 }
 
