@@ -81,7 +81,7 @@ public class ElasticBuffer extends JavaPlugin {
         }else{
             webhookUrl = elasticBufferConfigManager.getWebhookURL();
              port = elasticBufferConfigManager.getPort();
-             indexPattern = elasticBufferConfigManager.getIndexPattern();
+             indexPattern = elasticBufferConfigManager.getIndexPattern().toLowerCase();
              apiKey = elasticBufferConfigManager.getApiKey();
             urlString = webhookUrl + ":" + port + "/" + indexPattern + "/_bulk";
             if (elasticBufferConfigManager.isUseSSL()) {
