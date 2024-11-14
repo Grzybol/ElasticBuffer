@@ -1,0 +1,7 @@
+name: ElasticBuffer
+version: ${project.version}
+main: org.betterbox.elasticBuffer.ElasticBuffer
+api-version: '1.18'
+load: STARTUP
+authors: [ Grzybol ]
+
