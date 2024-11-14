@@ -81,7 +81,7 @@ public class ElasticBuffer extends JavaPlugin {
         }else{
             webhookUrl = elasticBufferConfigManager.getWebhookURL();
              port = elasticBufferConfigManager.getPort();
-             indexPattern = elasticBufferConfigManager.getIndexPattern();
+             indexPattern = elasticBufferConfigManager.getIndexPattern().toLowerCase();
              apiKey = elasticBufferConfigManager.getApiKey();
             urlString = webhookUrl + ":" + port + "/" + indexPattern + "/_bulk";
             if (elasticBufferConfigManager.isUseSSL()) {
@@ -146,8 +146,18 @@ public class ElasticBuffer extends JavaPlugin {
                 getLogger().info("Logs successfully sent to Elasticsearch");
                 elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.INFO, "Logs successfully sent to Elasticsearch");
             } else {
+                // Logowanie pełnej zwrotki od Elasticsearch w przypadku nieudanego żądania
+                try (BufferedReader errorReader = new BufferedReader(
+                        new InputStreamReader(connection.getErrorStream(), StandardCharsets.UTF_8))) {
+                    StringBuilder errorResponse = new StringBuilder();
+                    String line;
+                    while ((line = errorReader.readLine()) != null) {
+                        errorResponse.append(line).append("\n");
+                    }
+                    elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.ERROR, "Failed to send logs to Elasticsearch: HTTP " + responseCode);
+                    elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.ERROR, "Elasticsearch error response: " + errorResponse.toString());
+                }
                 getLogger().warning("Failed to send logs to Elasticsearch: HTTP " + responseCode);
-                elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.ERROR, "Failed to send logs to Elasticsearch: HTTP " + responseCode);
             }
         } catch (Exception e) {
             getLogger().severe("Error sending logs to Elasticsearch: " + e.getMessage());

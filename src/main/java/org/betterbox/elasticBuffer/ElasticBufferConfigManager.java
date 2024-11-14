@@ -243,7 +243,7 @@ public class ElasticBufferConfigManager {
         truststorePassword = plugin.getConfig().getString("truststore_password");
         // Logowanie konfiguracji dla debugowania
         elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.DEBUG, "ConfigManager: ReloadConfig: useSSL: " + useSSL);
-
+        elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.DEBUG, "ConfigManager: ReloadConfig: useSSL: " + useSSL);
 
 
     }
