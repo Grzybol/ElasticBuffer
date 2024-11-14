@@ -1,0 +1,62 @@
+name: Public release
+#
+on:
+  workflow_dispatch:
+    inputs:
+      logLevel:
+        description: 'Log level'
+        required: true
+        default: 'warning'
+        type: choice
+        options:
+        - info
+        - warning
+        - debug
+permissions:
+  contents: write
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0 # To ensure tags are fetched as well
+        token: ${{ secrets.GITHUB_TOKEN }} # Użyj GITHUB_TOKEN do checkout
+    - name: Set up JDK 17
+      uses: actions/setup-java@v3
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        cache: maven
+    - name: Build with Maven and Auto-Versioning
+      run: mvn -B build-helper:parse-version versions:set versions:commit package --file pom.xml
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: minecraft-plugin
+        path: target/*.jar
+    - name: Extract version and artifact name
+      id: extract_info
+      run: |
+        JAR_NAME=$(ls target/*.jar)
+        ARTIFACT_NAME=$(basename $JAR_NAME)
+        VERSION=$(echo $ARTIFACT_NAME | grep -oP '(?<=-)\d+\.\d+\.\d+(?=-SNAPSHOT)')
+        echo "::set-output name=version::v$VERSION"
+        echo "::set-output name=artifact_name::$ARTIFACT_NAME"
+    - name: Create and Push Tag
+      run: |
+        git config user.name "GitHub Actions"
+        git config user.email "github-actions@users.noreply.github.com"
+        git tag ${{ steps.extract_info.outputs.version }}
+        git push https://x-access-token:${{ secrets.BE_ACCESS_TOKEN }}@github.com/${{ github.repository }} ${{ steps.extract_info.outputs.version }}
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        name: ${{ steps.extract_info.outputs.artifact_name }}
+        tag_name: ${{ steps.extract_info.outputs.version }}
+        files: target/*.jar
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        
+ 
