@@ -6,7 +6,7 @@
 
     <groupId>org.betterbox</groupId>
     <artifactId>ElasticBuffer</artifactId>
-    <version>1.1.2-SNAPSHOT</version>
+    <version>1.1.4-SNAPSHOT</version>
     <packaging>jar</packaging>
 
     <name>ElasticBuffer</name>
@@ -80,6 +80,12 @@
             <id>sonatype</id>
             <url>https://oss.sonatype.org/content/groups/public/</url>
         </repository>
+
+            <repository>
+                <id>jitpack.io</id>
+                <url>https://jitpack.io</url>
+            </repository>
+
     </repositories>
 
     <dependencies>
@@ -106,5 +112,7 @@
             <version>1.18.2-R0.1-SNAPSHOT</version>
             <scope>provided</scope>
         </dependency>
+
+        
     </dependencies>
 </project>
