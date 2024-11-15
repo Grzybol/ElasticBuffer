@@ -41,7 +41,7 @@ jobs:
     - name: Upload Artifact
       uses: actions/upload-artifact@v3
       with:
-        name: ${{ env.artifact_name }}
+        name: ElasticBuffer-${{ env.version }}
         path: target/*.jar
     - name: Create and Push Tag
       run: |
