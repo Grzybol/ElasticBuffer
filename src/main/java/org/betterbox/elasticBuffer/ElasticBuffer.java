@@ -15,6 +15,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyManagementException;
+import java.security.KeyStore;
 import java.security.NoSuchAlgorithmException;
 import java.util.EnumSet;
 import java.util.List;
@@ -86,28 +87,56 @@ public class ElasticBuffer extends JavaPlugin {
     }
 
     public void sendLogs() {
-        try {// ... w Twojej metodzie sendLogs()
-            TrustManager[] trustAllCerts = new TrustManager[]{
-                    new X509TrustManager() {
-                        public java.security.cert.X509Certificate[] getAcceptedIssuers() {
-                            return null;
-                        }
+        if(elasticBufferConfigManager.getCheckCerts()) {
+            try {// ... w Twojej metodzie sendLogs()
+                TrustManager[] trustAllCerts = new TrustManager[]{
+                        new X509TrustManager() {
+                            public java.security.cert.X509Certificate[] getAcceptedIssuers() {
+                                return null;
+                            }
 
-                        public void checkClientTrusted(X509Certificate[] certs, String authType) {
-                        }
+                            public void checkClientTrusted(X509Certificate[] certs, String authType) {
+                            }
 
-                        public void checkServerTrusted(X509Certificate[] certs, String authType) {
+                            public void checkServerTrusted(X509Certificate[] certs, String authType) {
+                            }
                         }
-                    }
-            };
+                };
 
-            SSLContext sc = SSLContext.getInstance("SSL");
-            sc.init(null, trustAllCerts, new SecureRandom());
-            HttpsURLConnection.setDefaultSSLSocketFactory(sc.getSocketFactory());
-        }catch (NoSuchAlgorithmException e){
-            elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.ERROR, "NoSuchAlgorithmException "+e.getMessage());
-        }catch (KeyManagementException e){
-            elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.ERROR, "NoSuchAlgorithmException "+e.getMessage());
+                SSLContext sc = SSLContext.getInstance("SSL");
+                sc.init(null, trustAllCerts, new SecureRandom());
+                HttpsURLConnection.setDefaultSSLSocketFactory(sc.getSocketFactory());
+            } catch (NoSuchAlgorithmException e) {
+                elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.ERROR, "NoSuchAlgorithmException " + e.getMessage());
+            } catch (KeyManagementException e) {
+                elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.ERROR, "NoSuchAlgorithmException " + e.getMessage());
+            }
+        }else{
+            try {
+                // Ścieżka do truststore i hasło
+                String trustStorePath = elasticBufferConfigManager.getTruststorePath();
+                String trustStorePassword = elasticBufferConfigManager.getTruststorePassword();
+
+                // Załaduj truststore z pliku
+                KeyStore trustStore = KeyStore.getInstance(KeyStore.getDefaultType());
+                try (InputStream trustStoreIS = new FileInputStream(trustStorePath)) {
+                    trustStore.load(trustStoreIS, trustStorePassword.toCharArray());
+                }
+
+                // Utwórz TrustManagerFactory z załadowanym truststore
+                TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+                trustManagerFactory.init(trustStore);
+
+                // Zainicjalizuj SSLContext z TrustManagerFactory
+                SSLContext sslContext = SSLContext.getInstance("TLS");
+                sslContext.init(null, trustManagerFactory.getTrustManagers(), new SecureRandom());
+
+                // Ustaw SSLSocketFactory na HttpsURLConnection
+                HttpsURLConnection.setDefaultSSLSocketFactory(sslContext.getSocketFactory());
+            } catch (Exception e) {
+                elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.ERROR, "Error setting up SSL context: " + e.getMessage());
+                return;
+            }
         }
 
 // Wyłączanie weryfikacji nazwy hosta

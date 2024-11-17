@@ -19,7 +19,7 @@ public class ElasticBufferConfigManager {
     public int port;
     private String webhookURL,apiKey,indexPattern;
     private String truststorePath, truststorePassword;
-    private boolean useSSL,local=true,authorization=false;
+    private boolean useSSL,local=true,authorization=false,checkCerts=false;
 
 
     public ElasticBufferConfigManager(JavaPlugin plugin, ElasticBufferPluginLogger elasticBufferPluginLogger, String folderPath) {
@@ -258,11 +258,29 @@ public class ElasticBufferConfigManager {
             plugin.saveConfig();
         }
 
+        checkCerts = plugin.getConfig().getBoolean("checkCerts");
+        if (plugin.getConfig().contains("checkCerts")){
+            if (plugin.getConfig().isBoolean("checkCerts")){
+                checkCerts = plugin.getConfig().getBoolean("checkCerts", false);
+            }
+            else {
+                elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.WARNING, "ConfigManager: ReloadConfig: checkCerts incorrect! Restoring default");
+                plugin.getConfig().set("checkCerts", false);
+                plugin.saveConfig();
+            }
+        }
+        else{
+            elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.WARNING, "ConfigManager: ReloadConfig: checkCerts section not found in config! Creating new section..");
+            plugin.getConfig().createSection("checkCerts");
+            plugin.getConfig().set("checkCerts", false);
+            plugin.saveConfig();
+        }
+
 
         truststorePassword = plugin.getConfig().getString("truststore_password");
         // Logowanie konfiguracji dla debugowania
-        elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.DEBUG, "ConfigManager.ReloadConfig: useSSL: " + useSSL+", port: "+port+", authorization: "+authorization+", webhook: "+webhookURL+", local: "+local+", apiKey: "+apiKey+", index_pattern: "+indexPattern);
-
+        elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.DEBUG, "ConfigManager.ReloadConfig: useSSL: " + useSSL+", port: "+port+", authorization: "+authorization+", webhook: "+webhookURL+", local: "+local+", apiKey: "+apiKey+", index_pattern: "+indexPattern+", checkCerts: "+checkCerts);
+        elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.DEBUG, "ConfigManager.ReloadConfig: truststorePath: "+truststorePath+", truststore_password: "+truststorePassword);
 
     }
     public void updateConfig(String configuration) {
@@ -313,5 +331,7 @@ public class ElasticBufferConfigManager {
     public boolean isLocal(){
         return local;
     }
+
+    public boolean getCheckCerts(){return checkCerts;}
 }
 
