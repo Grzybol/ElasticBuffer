@@ -24,6 +24,7 @@ import java.util.Set;
 import javax.net.ssl.*;
 import java.security.SecureRandom;
 import java.security.cert.X509Certificate;
+import java.util.logging.Logger;
 
 public class ElasticBuffer extends JavaPlugin {
     private LogBuffer logBuffer;
@@ -32,6 +33,7 @@ public class ElasticBuffer extends JavaPlugin {
     public ElasticBufferAPI api;
     private ElasticBufferPluginLogger elasticBufferPluginLogger;
     ElasticBufferConfigManager elasticBufferConfigManager;
+    private CustomLogHandler customLogHandler;
 
     @Override
     public void onEnable() {
@@ -66,11 +68,18 @@ public class ElasticBuffer extends JavaPlugin {
         } else {
             elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.ERROR, "Command 'eb' not found. Check your plugin.yml");
         }
+
+        customLogHandler = new CustomLogHandler(this);
+        Logger logger = Bukkit.getLogger();
+        logger.addHandler(customLogHandler);
     }
 
     @Override
     public void onDisable() {
-
+        Logger logger = Bukkit.getLogger();
+        if (customLogHandler != null) {
+            logger.removeHandler(customLogHandler);
+        }
     }
     public static ElasticBuffer getInstance() {
         Plugin plugin = Bukkit.getPluginManager().getPlugin("ElasticBuffer");
