@@ -4,5 +4,14 @@ log_level:
   - ERROR
   - DEBUG
   - DEBUG_LVL2
+local: true #if true, we won't use provided webhookURL but http://localhost: or https://localhost: depending if Security is enabled
+authorization: true  #select true if using Security in Elasticsearch
+checkCerts: true  #select true if plugin should check certs provided by Elastic
+elasticsearch_port: 9200
+webhookURL: yourWebhookUrl
+apiKey: yourApiKey
+index_pattern: yourIndexPattern
+truststore_path: pathToCertFromYourElasticServer
+truststore_password: yourPassword
 
 

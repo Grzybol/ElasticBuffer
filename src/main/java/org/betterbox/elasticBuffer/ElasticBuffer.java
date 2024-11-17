@@ -99,7 +99,7 @@ public class ElasticBuffer extends JavaPlugin {
     }
 
     public void sendLogs() {
-        if(elasticBufferConfigManager.getCheckCerts()) {
+        if(!elasticBufferConfigManager.getCheckCerts()) {
             try {// ... w Twojej metodzie sendLogs()
                 TrustManager[] trustAllCerts = new TrustManager[]{
                         new X509TrustManager() {
@@ -163,9 +163,9 @@ public class ElasticBuffer extends JavaPlugin {
         //String apiKey = elasticBufferConfigManager.getApiKey();
         String apiKey = "Y1k2S05wTUJjYTBQeDZOZ0c1aUg6RVA0M185YjdUMC1CQW1FNTVmeEJDZw==";
         if(elasticBufferConfigManager.isLocal()){
-            urlString = "http://localhost:9200/"+indexPattern+"/_bulk";
+            urlString = "http://localhost:"+port+"/"+indexPattern+"/_bulk";
             if(elasticBufferConfigManager.getAuthorization()){
-                urlString = "https://localhost:9200/"+indexPattern+"/_bulk";
+                urlString = "https://localhost:"+port+"/"+indexPattern+"/_bulk";
             }
 
         }else{

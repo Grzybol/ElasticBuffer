@@ -186,6 +186,7 @@ public class ElasticBufferConfigManager {
             plugin.saveConfig();
         }
 
+        /*
         useSSL = plugin.getConfig().getBoolean("use_ssl");
         if (plugin.getConfig().contains("use_ssl")){
             if (plugin.getConfig().isBoolean("use_ssl")){
@@ -203,6 +204,7 @@ public class ElasticBufferConfigManager {
             plugin.getConfig().set("use_ssl", false);
             plugin.saveConfig();
         }
+         */
 
         truststorePath = plugin.getConfig().getString("truststore_path");
         if (plugin.getConfig().contains("truststore_path")){
