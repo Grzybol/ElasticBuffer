@@ -1,17 +1,28 @@
 package org.betterbox.elasticBuffer;
 
 import org.bukkit.Bukkit;
+import org.bukkit.command.PluginCommand;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.ServicePriority;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.*;
 import java.net.HttpURLConnection;
+import java.net.URI;
 import java.net.URL;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.security.KeyManagementException;
+import java.security.KeyStore;
+import java.security.NoSuchAlgorithmException;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
+import javax.net.ssl.*;
+import java.security.SecureRandom;
+import java.security.cert.X509Certificate;
 
 public class ElasticBuffer extends JavaPlugin {
     private LogBuffer logBuffer;
@@ -46,7 +57,12 @@ public class ElasticBuffer extends JavaPlugin {
         }catch (Exception e){
             elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.ERROR, "bufferPlugin3: null, exception "+e.getMessage());
         }
-
+        PluginCommand ebCommand = getCommand("eb");
+        if (ebCommand != null) {
+            ebCommand.setExecutor(new CommandManager(this, this, elasticBufferConfigManager));
+        } else {
+            elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.ERROR, "Command 'eb' not found. Check your plugin.yml");
+        }
     }
 
     @Override
@@ -71,18 +87,76 @@ public class ElasticBuffer extends JavaPlugin {
     }
 
     public void sendLogs() {
-        String urlString;
-        String webhookUrl;
-        int port;
-        String indexPattern;
-        String apiKey = null;
-        if(elasticBufferConfigManager.isLocal()){
-            urlString = "http://localhost:9200/betterbox/_bulk";
+        if(elasticBufferConfigManager.getCheckCerts()) {
+            try {// ... w Twojej metodzie sendLogs()
+                TrustManager[] trustAllCerts = new TrustManager[]{
+                        new X509TrustManager() {
+                            public java.security.cert.X509Certificate[] getAcceptedIssuers() {
+                                return null;
+                            }
+
+                            public void checkClientTrusted(X509Certificate[] certs, String authType) {
+                            }
+
+                            public void checkServerTrusted(X509Certificate[] certs, String authType) {
+                            }
+                        }
+                };
+
+                SSLContext sc = SSLContext.getInstance("SSL");
+                sc.init(null, trustAllCerts, new SecureRandom());
+                HttpsURLConnection.setDefaultSSLSocketFactory(sc.getSocketFactory());
+            } catch (NoSuchAlgorithmException e) {
+                elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.ERROR, "NoSuchAlgorithmException " + e.getMessage());
+            } catch (KeyManagementException e) {
+                elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.ERROR, "NoSuchAlgorithmException " + e.getMessage());
+            }
         }else{
-            webhookUrl = elasticBufferConfigManager.getWebhookURL();
-             port = elasticBufferConfigManager.getPort();
-             indexPattern = elasticBufferConfigManager.getIndexPattern().toLowerCase();
-             apiKey = elasticBufferConfigManager.getApiKey();
+            try {
+                // Ścieżka do truststore i hasło
+                String trustStorePath = elasticBufferConfigManager.getTruststorePath();
+                String trustStorePassword = elasticBufferConfigManager.getTruststorePassword();
+
+                // Załaduj truststore z pliku
+                KeyStore trustStore = KeyStore.getInstance(KeyStore.getDefaultType());
+                try (InputStream trustStoreIS = new FileInputStream(trustStorePath)) {
+                    trustStore.load(trustStoreIS, trustStorePassword.toCharArray());
+                }
+
+                // Utwórz TrustManagerFactory z załadowanym truststore
+                TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+                trustManagerFactory.init(trustStore);
+
+                // Zainicjalizuj SSLContext z TrustManagerFactory
+                SSLContext sslContext = SSLContext.getInstance("TLS");
+                sslContext.init(null, trustManagerFactory.getTrustManagers(), new SecureRandom());
+
+                // Ustaw SSLSocketFactory na HttpsURLConnection
+                HttpsURLConnection.setDefaultSSLSocketFactory(sslContext.getSocketFactory());
+            } catch (Exception e) {
+                elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.ERROR, "Error setting up SSL context: " + e.getMessage());
+                return;
+            }
+        }
+
+// Wyłączanie weryfikacji nazwy hosta
+        HostnameVerifier allHostsValid = (hostname, session) -> true;
+        HttpsURLConnection.setDefaultHostnameVerifier(allHostsValid);
+
+        elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.DEBUG, "sendLogs() called");
+        String urlString;
+        String webhookUrl= elasticBufferConfigManager.getWebhookURL();;
+        int port= elasticBufferConfigManager.getPort();
+        String indexPattern= elasticBufferConfigManager.getIndexPattern().toLowerCase();
+        //String apiKey = elasticBufferConfigManager.getApiKey();
+        String apiKey = "Y1k2S05wTUJjYTBQeDZOZ0c1aUg6RVA0M185YjdUMC1CQW1FNTVmeEJDZw==";
+        if(elasticBufferConfigManager.isLocal()){
+            urlString = "http://localhost:9200/"+indexPattern+"/_bulk";
+            if(elasticBufferConfigManager.getAuthorization()){
+                urlString = "https://localhost:9200/"+indexPattern+"/_bulk";
+            }
+
+        }else{
             urlString = webhookUrl + ":" + port + "/" + indexPattern + "/_bulk";
             if (elasticBufferConfigManager.isUseSSL()) {
                 try {
@@ -95,8 +169,8 @@ public class ElasticBuffer extends JavaPlugin {
                 }
             }
         }
-        elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.DEBUG, "sendLogs() called");
-        api.log("sendLogs() called", "DEBUG", "ElasticBuffer",null);
+        elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.INFO, "isLocal() "+elasticBufferConfigManager.isLocal()+", urlString: "+urlString);
+        //api.log("sendLogs() called", "DEBUG", "ElasticBuffer",null);
         List<LogEntry> logsToSend = logBuffer.getAndClear();
 
         try {
@@ -104,11 +178,17 @@ public class ElasticBuffer extends JavaPlugin {
             HttpURLConnection connection = (HttpURLConnection) url.openConnection();
             connection.setRequestMethod("POST");
             connection.setRequestProperty("Content-Type", "application/x-ndjson; charset=UTF-8");
-            if(!elasticBufferConfigManager.isLocal()){
+            if(elasticBufferConfigManager.getAuthorization()){
                 connection.setRequestProperty("Authorization", "ApiKey " + apiKey);
+                // Dodaj logowanie klucza API tylko jeśli jest to bezpieczne!
+                elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.DEBUG, "Authorization set: ApiKey "+apiKey);
             }
             connection.setDoOutput(true);
-
+            // Logowanie dodatkowych ustawień połączenia
+            elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.DEBUG, "Do Output: " + connection.getDoOutput());
+            elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.DEBUG, "Connect Timeout: " + connection.getConnectTimeout());
+            elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.DEBUG, "Read Timeout: " + connection.getReadTimeout());
+            elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.DEBUG, "Using Proxy: " + (connection.usingProxy() ? "Yes" : "No"));
 
             // Tworzymy NDJSON (newline-delimited JSON) dla operacji bulk
             StringBuilder ndjsonBuilder = new StringBuilder();
@@ -134,7 +214,10 @@ public class ElasticBuffer extends JavaPlugin {
                 elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.DEBUG, "Sending NDJSON: " + ndjsonContent);
             }
 
+
             int responseCode = connection.getResponseCode();
+            elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.DEBUG, "Elasticsearch responseCode: "+responseCode);
+            /*
             if (responseCode == HttpURLConnection.HTTP_OK) {
                 try (BufferedReader reader = new BufferedReader(
                         new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8))) {
@@ -159,11 +242,52 @@ public class ElasticBuffer extends JavaPlugin {
                 }
                 getLogger().warning("Failed to send logs to Elasticsearch: HTTP " + responseCode);
             }
-        } catch (Exception e) {
+
+             */
+
+
+            /*
+            HttpClient client = HttpClient.newHttpClient();
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(urlString))
+                    .header("Authorization", "ApiKey " + apiKey)
+                    .header("Content-Type", "application/x-ndjson; charset=UTF-8")
+                    .POST(HttpRequest.BodyPublishers.ofString(buildNdjson()))
+                    .build();
+
+            try {
+                HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+                elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.INFO, "Response status code: " + response.statusCode());
+                elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.DEBUG, "Response body: " + response.body());
+            } catch (Exception e) {
+                getLogger().severe("Error sending logs to Elasticsearch: " + e.getMessage());
+                elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.ERROR, "Error sending logs to Elasticsearch: " + e.getMessage());
+            }
+
+             */
+        }catch (Exception e) {
             getLogger().severe("Error sending logs to Elasticsearch: " + e.getMessage());
             elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.ERROR, "Error sending logs to Elasticsearch: " + e.getMessage());
         }
+
+
+
     }
 
-
+    private String buildNdjson() {
+        List<LogEntry> logsToSend = logBuffer.getAndClear();
+        StringBuilder ndjsonBuilder = new StringBuilder();
+        for (LogEntry logEntry : logsToSend) {
+            ndjsonBuilder.append("{\"index\":{}}\n");
+            ndjsonBuilder.append(String.format(
+                    "{\"timestamp\":\"%s\",\"plugin\":\"%s\",\"transactionID\":\"%s\",\"level\":\"%s\",\"message\":\"%s\"}\n",
+                    java.time.format.DateTimeFormatter.ISO_INSTANT.format(java.time.Instant.ofEpochMilli(logEntry.getTimestamp())),
+                    logEntry.getPluginName(),
+                    logEntry.getTransactionID(),
+                    logEntry.getLevel(),
+                    logEntry.getMessage()
+            ));
+        }
+        return ndjsonBuilder.toString();
+    }
 }

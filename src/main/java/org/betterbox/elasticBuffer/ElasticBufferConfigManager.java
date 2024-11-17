@@ -19,7 +19,7 @@ public class ElasticBufferConfigManager {
     public int port;
     private String webhookURL,apiKey,indexPattern;
     private String truststorePath, truststorePassword;
-    private boolean useSSL,local=true;
+    private boolean useSSL,local=true,authorization=false,checkCerts=false;
 
 
     public ElasticBufferConfigManager(JavaPlugin plugin, ElasticBufferPluginLogger elasticBufferPluginLogger, String folderPath) {
@@ -240,11 +240,47 @@ public class ElasticBufferConfigManager {
             plugin.saveConfig();
         }
 
+        authorization = plugin.getConfig().getBoolean("authorization");
+        if (plugin.getConfig().contains("authorization")){
+            if (plugin.getConfig().isBoolean("authorization")){
+                authorization = plugin.getConfig().getBoolean("authorization", false);
+            }
+            else {
+                elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.WARNING, "ConfigManager: ReloadConfig: authorization incorrect! Restoring default");
+                plugin.getConfig().set("authorization", false);
+                plugin.saveConfig();
+            }
+        }
+        else{
+            elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.WARNING, "ConfigManager: ReloadConfig: authorization section not found in config! Creating new section..");
+            plugin.getConfig().createSection("authorization");
+            plugin.getConfig().set("authorization", false);
+            plugin.saveConfig();
+        }
+
+        checkCerts = plugin.getConfig().getBoolean("checkCerts");
+        if (plugin.getConfig().contains("checkCerts")){
+            if (plugin.getConfig().isBoolean("checkCerts")){
+                checkCerts = plugin.getConfig().getBoolean("checkCerts", false);
+            }
+            else {
+                elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.WARNING, "ConfigManager: ReloadConfig: checkCerts incorrect! Restoring default");
+                plugin.getConfig().set("checkCerts", false);
+                plugin.saveConfig();
+            }
+        }
+        else{
+            elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.WARNING, "ConfigManager: ReloadConfig: checkCerts section not found in config! Creating new section..");
+            plugin.getConfig().createSection("checkCerts");
+            plugin.getConfig().set("checkCerts", false);
+            plugin.saveConfig();
+        }
+
+
         truststorePassword = plugin.getConfig().getString("truststore_password");
         // Logowanie konfiguracji dla debugowania
-        elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.DEBUG, "ConfigManager: ReloadConfig: useSSL: " + useSSL);
-        elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.DEBUG, "ConfigManager: ReloadConfig: useSSL: " + useSSL);
-
+        elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.DEBUG, "ConfigManager.ReloadConfig: useSSL: " + useSSL+", port: "+port+", authorization: "+authorization+", webhook: "+webhookURL+", local: "+local+", apiKey: "+apiKey+", index_pattern: "+indexPattern+", checkCerts: "+checkCerts);
+        elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.DEBUG, "ConfigManager.ReloadConfig: truststorePath: "+truststorePath+", truststore_password: "+truststorePassword);
 
     }
     public void updateConfig(String configuration) {
@@ -272,6 +308,7 @@ public class ElasticBufferConfigManager {
     public int getPort() {
         return port;
     }
+    public boolean getAuthorization(){return authorization;}
 
     public String getWebhookURL() {
         return webhookURL;
@@ -294,5 +331,7 @@ public class ElasticBufferConfigManager {
     public boolean isLocal(){
         return local;
     }
+
+    public boolean getCheckCerts(){return checkCerts;}
 }
 
