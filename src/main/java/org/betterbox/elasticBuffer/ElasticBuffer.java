@@ -1,5 +1,6 @@
 package org.betterbox.elasticBuffer;
 
+import org.bstats.bukkit.Metrics;
 import org.bukkit.Bukkit;
 import org.bukkit.command.PluginCommand;
 import org.bukkit.plugin.Plugin;
@@ -34,6 +35,8 @@ public class ElasticBuffer extends JavaPlugin {
 
     @Override
     public void onEnable() {
+        int pluginId = 23919; // Zamień na rzeczywisty ID twojego pluginu na bStats
+        Metrics metrics = new Metrics(this, pluginId);
         Bukkit.getServicesManager().register(ElasticBuffer.class, this, this, ServicePriority.Normal);
         api = new ElasticBufferAPI(this);
         Bukkit.getServicesManager().register(ElasticBufferAPI.class, api, this, ServicePriority.Normal);
