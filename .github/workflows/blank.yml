@@ -30,11 +30,6 @@ jobs:
         cache: maven
     - name: Build with Maven and Auto-Versioning
       run: mvn -B build-helper:parse-version versions:set versions:commit package --file pom.xml
-    - name: Upload Artifact
-      uses: actions/upload-artifact@v3
-      with:
-        name: minecraft-plugin
-        path: target/*.jar
     - name: Extract version and artifact name
       id: extract_info
       run: |
@@ -43,6 +38,11 @@ jobs:
         VERSION=$(echo $ARTIFACT_NAME | grep -oP '(?<=-)\d+\.\d+\.\d+(?=-SNAPSHOT)')
         echo "::set-output name=version::v$VERSION"
         echo "::set-output name=artifact_name::$ARTIFACT_NAME"
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: ElasticBuffer-${{ env.version }}
+        path: target/*.jar
     - name: Create and Push Tag
       run: |
         git config user.name "GitHub Actions"
