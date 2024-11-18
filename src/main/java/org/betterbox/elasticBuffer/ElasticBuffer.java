@@ -160,8 +160,7 @@ public class ElasticBuffer extends JavaPlugin {
         String webhookUrl= elasticBufferConfigManager.getWebhookURL();;
         int port= elasticBufferConfigManager.getPort();
         String indexPattern= elasticBufferConfigManager.getIndexPattern().toLowerCase();
-        //String apiKey = elasticBufferConfigManager.getApiKey();
-        String apiKey = "Y1k2S05wTUJjYTBQeDZOZ0c1aUg6RVA0M185YjdUMC1CQW1FNTVmeEJDZw==";
+        String apiKey = elasticBufferConfigManager.getApiKey();
         if(elasticBufferConfigManager.isLocal()){
             urlString = "http://localhost:"+port+"/"+indexPattern+"/_bulk";
             if(elasticBufferConfigManager.getAuthorization()){
