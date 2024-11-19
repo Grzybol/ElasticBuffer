@@ -28,11 +28,11 @@ public class CommandManager implements CommandExecutor {
     }
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-        elasticBuffer.receiveLog("CommandManager.onCommand called, sender: " + sender + ", args: " + String.join(", ", args),"DEBUG",plugin.getDescription().getName(),null);
+        elasticBuffer.receiveLog("CommandManager.onCommand called, sender: " + sender + ", args: " + String.join(", ", args),"DEBUG",plugin.getDescription().getName(),null,sender.getName(),null);
         if (args.length == 1 && args[0].equalsIgnoreCase("reload")) {
             if (!sender.hasPermission("betterquests.reload")) {
                 sender.sendMessage(ChatColor.GOLD+""+ChatColor.BOLD+"[BetterQuests]"+ChatColor.DARK_RED + " You don't have permission to do that!");
-                elasticBuffer.receiveLog("Help command failed due to lack of permissions, sender: " + sender, "ERROR",plugin.getDescription().getName(),null);
+                elasticBuffer.receiveLog("Help command failed due to lack of permissions, sender: " + sender, "ERROR",plugin.getDescription().getName(),null,sender.getName(),null);
                 return true;
             }
             configManager.ReloadConfig();

@@ -92,9 +92,14 @@ public class ElasticBuffer extends JavaPlugin {
 
 
 
+    public void receiveLog(String log, String level, String pluginName,String transactionID,String playerName, String uuid) {
+        long logTimestamp = System.currentTimeMillis();
+        logBuffer.add(log, level, pluginName,logTimestamp,transactionID,playerName,uuid);
+        elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.DEBUG, "Received log: " + log+", pluginName: "+pluginName+". level: "+level);
+    }
     public void receiveLog(String log, String level, String pluginName,String transactionID) {
         long logTimestamp = System.currentTimeMillis();
-        logBuffer.add(log, level, pluginName,logTimestamp,transactionID);
+        logBuffer.add(log, level, pluginName,logTimestamp,transactionID,null,null);
         elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.DEBUG, "Received log: " + log+", pluginName: "+pluginName+". level: "+level);
     }
 
@@ -208,12 +213,15 @@ public class ElasticBuffer extends JavaPlugin {
                 ndjsonBuilder.append("{\"index\":{}}\n");
                 // Dane logu z timestampem zapisanym w momencie odbioru
                 ndjsonBuilder.append(String.format(
-                        "{\"timestamp\":\"%s\",\"plugin\":\"%s\",\"transactionID\":\"%s\",\"level\":\"%s\",\"message\":\"%s\"}\n",
+                        "{\"timestamp\":\"%s\",\"plugin\":\"%s\",\"transactionID\":\"%s\",\"level\":\"%s\",\"message\":\"%s\",\"playerName\":\"%s\",\"uuid\":\"%s\"}\n",
                         java.time.format.DateTimeFormatter.ISO_INSTANT.format(java.time.Instant.ofEpochMilli(logEntry.getTimestamp())),
                         logEntry.getPluginName(),
                         logEntry.getTransactionID(),
                         logEntry.getLevel(),
-                        logEntry.getMessage()
+                        logEntry.getMessage(),
+                        logEntry.getPlayerName(),
+                        logEntry.getUuid()
+
                 ));
             }
 
