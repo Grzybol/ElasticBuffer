@@ -15,7 +15,7 @@ public class CustomLogHandler extends Handler {
     public void publish(LogRecord record) {
         if (record.getLevel().intValue() >= Level.INFO.intValue()) {
             String message = record.getMessage();
-            bufferPlugin.receiveLog(message, "server-logs", "server-logs", null);
+            bufferPlugin.receiveLog(message, "server-logs", "server-logs", null,null,null);
         }
     }
 

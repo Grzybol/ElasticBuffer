@@ -1,23 +1,30 @@
 package org.betterbox.elasticBuffer;
 
+import java.util.UUID;
+
 public class LogEntry {
     private final String message;
     private final String level;
     private final String pluginName;
     private final long timestamp;
     private final String transactionID;
-
-    public LogEntry(String message, String level,String pluginName, long timestamp,String transactionID) {
+    private final String playerName;
+    private final String uuid;
+    public LogEntry(String message, String level,String pluginName, long timestamp,String transactionID,String playerName, String uuid) {
         this.message = message;
         this.level = level;
         this.timestamp = timestamp;
         this.pluginName = pluginName;
         this.transactionID = (transactionID != null) ? transactionID : "N/A";
+        this.playerName = (transactionID != null) ? transactionID : "N/A";
+        this.uuid = (transactionID != null) ? transactionID : "N/A";
     }
 
     public String getMessage() {
         return message;
     }
+    public String getPlayerName(){return playerName;}
+    public String getUuid(){return  uuid;}
     public String getPluginName() {
         return pluginName;
     }
