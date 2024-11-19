@@ -100,7 +100,7 @@ public class ElasticBuffer extends JavaPlugin {
 
     public void sendLogs() {
         if(!elasticBufferConfigManager.getCheckCerts()) {
-            try {// ... w Twojej metodzie sendLogs()
+            try {
                 TrustManager[] trustAllCerts = new TrustManager[]{
                         new X509TrustManager() {
                             public java.security.cert.X509Certificate[] getAcceptedIssuers() {
@@ -228,54 +228,6 @@ public class ElasticBuffer extends JavaPlugin {
 
             int responseCode = connection.getResponseCode();
             elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.DEBUG, "Elasticsearch responseCode: "+responseCode);
-            /*
-            if (responseCode == HttpURLConnection.HTTP_OK) {
-                try (BufferedReader reader = new BufferedReader(
-                        new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8))) {
-                    String responseLine;
-                    while ((responseLine = reader.readLine()) != null) {
-                        elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.DEBUG, "Elasticsearch response: "+responseLine);
-                    }
-                }
-                getLogger().info("Logs successfully sent to Elasticsearch");
-                elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.INFO, "Logs successfully sent to Elasticsearch");
-            } else {
-                // Logowanie pełnej zwrotki od Elasticsearch w przypadku nieudanego żądania
-                try (BufferedReader errorReader = new BufferedReader(
-                        new InputStreamReader(connection.getErrorStream(), StandardCharsets.UTF_8))) {
-                    StringBuilder errorResponse = new StringBuilder();
-                    String line;
-                    while ((line = errorReader.readLine()) != null) {
-                        errorResponse.append(line).append("\n");
-                    }
-                    elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.ERROR, "Failed to send logs to Elasticsearch: HTTP " + responseCode);
-                    elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.ERROR, "Elasticsearch error response: " + errorResponse.toString());
-                }
-                getLogger().warning("Failed to send logs to Elasticsearch: HTTP " + responseCode);
-            }
-
-             */
-
-
-            /*
-            HttpClient client = HttpClient.newHttpClient();
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(urlString))
-                    .header("Authorization", "ApiKey " + apiKey)
-                    .header("Content-Type", "application/x-ndjson; charset=UTF-8")
-                    .POST(HttpRequest.BodyPublishers.ofString(buildNdjson()))
-                    .build();
-
-            try {
-                HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-                elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.INFO, "Response status code: " + response.statusCode());
-                elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.DEBUG, "Response body: " + response.body());
-            } catch (Exception e) {
-                getLogger().severe("Error sending logs to Elasticsearch: " + e.getMessage());
-                elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.ERROR, "Error sending logs to Elasticsearch: " + e.getMessage());
-            }
-
-             */
         }catch (Exception e) {
             getLogger().severe("Error sending logs to Elasticsearch: " + e.getMessage());
             elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.ERROR, "Error sending logs to Elasticsearch: " + e.getMessage());
