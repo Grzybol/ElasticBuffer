@@ -18,7 +18,7 @@ public class ElasticBufferConfigManager {
     private Map<Integer, String> rankHierarchy;
     public int port;
     private String webhookURL,apiKey,indexPattern;
-    private String truststorePath, truststorePassword;
+    private String truststorePath, truststorePassword,serverName="default-server";
     private boolean useSSL,local=true,authorization=false,checkCerts=false;
 
 
@@ -186,6 +186,8 @@ public class ElasticBufferConfigManager {
             plugin.saveConfig();
         }
 
+
+
         /*
         useSSL = plugin.getConfig().getBoolean("use_ssl");
         if (plugin.getConfig().contains("use_ssl")){
@@ -278,6 +280,24 @@ public class ElasticBufferConfigManager {
             plugin.saveConfig();
         }
 
+        serverName = plugin.getConfig().getString("serverName");
+        if (plugin.getConfig().contains("serverName")){
+            if (plugin.getConfig().isString("serverName")){
+                serverName = plugin.getConfig().getString("serverName", "default-server-name");
+            }
+            else {
+                elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.WARNING, "ConfigManager: ReloadConfig: serverName incorrect! Restoring default");
+                plugin.getConfig().set("serverName", "default-server-name");
+                plugin.saveConfig();
+            }
+        }
+        else{
+            elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.WARNING, "ConfigManager: ReloadConfig: serverName section not found in config! Creating new section..");
+            plugin.getConfig().createSection("serverName");
+            plugin.getConfig().set("serverName", "default-server-name");
+            plugin.saveConfig();
+        }
+
 
         truststorePassword = plugin.getConfig().getString("truststore_password");
         // Logowanie konfiguracji dla debugowania
@@ -335,5 +355,8 @@ public class ElasticBufferConfigManager {
     }
 
     public boolean getCheckCerts(){return checkCerts;}
+    public String getServerName() {
+        return serverName;
+    }
 }
 
