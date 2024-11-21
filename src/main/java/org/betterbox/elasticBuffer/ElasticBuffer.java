@@ -24,6 +24,7 @@ import java.util.Set;
 import javax.net.ssl.*;
 import java.security.SecureRandom;
 import java.security.cert.X509Certificate;
+import java.util.logging.Handler;
 import java.util.logging.Logger;
 
 public class ElasticBuffer extends JavaPlugin {
@@ -69,17 +70,32 @@ public class ElasticBuffer extends JavaPlugin {
             elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.ERROR, "Command 'eb' not found. Check your plugin.yml");
         }
 
-        customLogHandler = new CustomLogHandler(this);
-        Logger logger = Bukkit.getLogger();
-        logger.addHandler(customLogHandler);
+        /*
+        Logger globalLogger = Logger.getLogger("");
+        Logger serverLogger = getServer().getLogger();
+        if (!handlerExists(globalLogger)) {
+            globalLogger.addHandler(new CustomLogHandler(this));
+        }
+        if (!handlerExists(serverLogger)) {
+            serverLogger.addHandler(new CustomLogHandler(this));
+        }
+
+         */
+
+
+
     }
+
 
     @Override
     public void onDisable() {
+        /*
         Logger logger = Bukkit.getLogger();
         if (customLogHandler != null) {
             logger.removeHandler(customLogHandler);
         }
+
+         */
     }
     public static ElasticBuffer getInstance() {
         Plugin plugin = Bukkit.getPluginManager().getPlugin("ElasticBuffer");
@@ -94,12 +110,17 @@ public class ElasticBuffer extends JavaPlugin {
 
     public void receiveLog(String log, String level, String pluginName,String transactionID,String playerName, String uuid) {
         long logTimestamp = System.currentTimeMillis();
-        logBuffer.add(log, level, pluginName,logTimestamp,transactionID,playerName,uuid);
+        logBuffer.add(log, level, pluginName,logTimestamp,transactionID,playerName,uuid,null);
+        elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.DEBUG, "Received log: " + log+", pluginName: "+pluginName+". level: "+level);
+    }
+    public void receiveLog(String log, String level, String pluginName,String transactionID,String playerName, String uuid,String serverName) {
+        long logTimestamp = System.currentTimeMillis();
+        logBuffer.add(log, level, pluginName,logTimestamp,transactionID,playerName,uuid,serverName);
         elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.DEBUG, "Received log: " + log+", pluginName: "+pluginName+". level: "+level);
     }
     public void receiveLog(String log, String level, String pluginName,String transactionID) {
         long logTimestamp = System.currentTimeMillis();
-        logBuffer.add(log, level, pluginName,logTimestamp,transactionID,null,null);
+        logBuffer.add(log, level, pluginName,logTimestamp,transactionID,null,null,null);
         elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.DEBUG, "Received log: " + log+", pluginName: "+pluginName+". level: "+level);
     }
 
