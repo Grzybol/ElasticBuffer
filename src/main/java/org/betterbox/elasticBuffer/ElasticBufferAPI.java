@@ -15,6 +15,11 @@ public class ElasticBufferAPI {
             elasticBuffer.receiveLog(message, level, pluginName,transactionID,playerName,uuid);
         }
     }
+    public void log(String message, String level, String pluginName, String transactionID,String playerName,String uuid,String serverName) {
+        if (elasticBuffer != null) {
+            elasticBuffer.receiveLog(message, level, pluginName,transactionID,playerName,uuid, serverName);
+        }
+    }
     public void log(String message, String level, String pluginName, String transactionID) {
         if (elasticBuffer != null) {
             elasticBuffer.receiveLog(message, level, pluginName,transactionID);

@@ -10,14 +10,16 @@ public class LogEntry {
     private final String transactionID;
     private final String playerName;
     private final String uuid;
-    public LogEntry(String message, String level,String pluginName, long timestamp,String transactionID,String playerName, String uuid) {
+    private final String serverName;
+    public LogEntry(String message, String level,String pluginName, long timestamp,String transactionID,String playerName, String uuid,String serverName) {
         this.message = message;
         this.level = level;
         this.timestamp = timestamp;
         this.pluginName = pluginName;
         this.transactionID = (transactionID != null) ? transactionID : "N/A";
-        this.playerName = (transactionID != null) ? transactionID : "N/A";
-        this.uuid = (transactionID != null) ? transactionID : "N/A";
+        this.playerName = (playerName != null) ? playerName : "N/A";
+        this.uuid = (uuid != null) ? uuid : "N/A";
+        this.serverName = (serverName != null) ? serverName : "default-server"; //added
     }
 
     public String getMessage() {
