@@ -19,7 +19,7 @@ public class LogEntry {
         this.transactionID = (transactionID != null) ? transactionID : "N/A";
         this.playerName = (playerName != null) ? playerName : "N/A";
         this.uuid = (uuid != null) ? uuid : "N/A";
-        this.serverName = (serverName != null) ? serverName : "default-server";
+        this.serverName = (serverName != null) ? serverName : "default-server"; //added
     }
 
     public String getMessage() {
