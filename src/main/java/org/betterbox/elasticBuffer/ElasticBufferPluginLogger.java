@@ -51,12 +51,12 @@ public class ElasticBufferPluginLogger {
     }
 
     // Metoda do logowania z domyślnym poziomem INFO
-    public void log(String message) {
+    public synchronized void log(String message) {
         log(LogLevel.INFO, message);
     }
 
     // Metoda do logowania z określonym poziomem
-    public void log(LogLevel level, String message) {
+    public synchronized void log(LogLevel level, String message) {
         if (enabledLogLevels.contains(level)) {
             // Dodanie timestampu i poziomu logowania do wiadomości
             String timestamp = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS").format(new Date());
@@ -78,7 +78,7 @@ public class ElasticBufferPluginLogger {
 
         }
     }
-    public void log(LogLevel level, String message,String transactionID) {
+    public synchronized void log(LogLevel level, String message,String transactionID) {
         if (enabledLogLevels.contains(level)) {
             // Dodanie timestampu i poziomu logowania do wiadomości
             String timestamp = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS").format(new Date());
@@ -101,16 +101,12 @@ public class ElasticBufferPluginLogger {
     }
 
     // Metoda do ustawiania aktywnych poziomów logowania
-    public void setEnabledLogLevels(Set<LogLevel> configEnabledLogLevels) {
+    public synchronized void setEnabledLogLevels(Set<LogLevel> configEnabledLogLevels) {
         this.enabledLogLevels = configEnabledLogLevels;
         log("Enabled Log levels "+ Arrays.toString(enabledLogLevels.toArray()));
 
     }
-    public void setEnabledEventItems(Set<LogLevel> configEnabledEventItems) {
-        this.enabledLogLevels = configEnabledEventItems;
-        log("Enabled Log levels "+ Arrays.toString(enabledLogLevels.toArray()));
 
-    }
 
 
 }

@@ -69,33 +69,24 @@ public class ElasticBuffer extends JavaPlugin {
         } else {
             elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.ERROR, "Command 'eb' not found. Check your plugin.yml");
         }
-
-        /*
-        Logger globalLogger = Logger.getLogger("");
-        Logger serverLogger = getServer().getLogger();
-        if (!handlerExists(globalLogger)) {
-            globalLogger.addHandler(new CustomLogHandler(this));
-        }
-        if (!handlerExists(serverLogger)) {
-            serverLogger.addHandler(new CustomLogHandler(this));
-        }
-
-         */
-
-
-
+        Logger logger = Bukkit.getLogger();
+        customLogHandler = new CustomLogHandler(this);
+        logger.addHandler(customLogHandler);
+        getServer().getPluginManager().registerEvents(new EventLogger(api,this), this);
+        // Rejestracja listenera zdarzeń serwerowych
+        getServer().getPluginManager().registerEvents(new ServerEventLogger(api, this), this);
     }
 
 
     @Override
     public void onDisable() {
-        /*
+
         Logger logger = Bukkit.getLogger();
         if (customLogHandler != null) {
             logger.removeHandler(customLogHandler);
         }
 
-         */
+
     }
     public static ElasticBuffer getInstance() {
         Plugin plugin = Bukkit.getPluginManager().getPlugin("ElasticBuffer");
@@ -108,19 +99,14 @@ public class ElasticBuffer extends JavaPlugin {
 
 
 
-    public void receiveLog(String log, String level, String pluginName,String transactionID,String playerName, String uuid) {
+    public synchronized void receiveLog(String log, String level, String pluginName,String transactionID,String playerName, String uuid) {
         long logTimestamp = System.currentTimeMillis();
-        logBuffer.add(log, level, pluginName,logTimestamp,transactionID,playerName,uuid,null);
+        logBuffer.add(log, level, pluginName,logTimestamp,transactionID,playerName,uuid);
         elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.DEBUG, "Received log: " + log+", pluginName: "+pluginName+". level: "+level);
     }
-    public void receiveLog(String log, String level, String pluginName,String transactionID,String playerName, String uuid,String serverName) {
+    public synchronized void receiveLog(String log, String level, String pluginName,String transactionID) {
         long logTimestamp = System.currentTimeMillis();
-        logBuffer.add(log, level, pluginName,logTimestamp,transactionID,playerName,uuid,serverName);
-        elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.DEBUG, "Received log: " + log+", pluginName: "+pluginName+". level: "+level);
-    }
-    public void receiveLog(String log, String level, String pluginName,String transactionID) {
-        long logTimestamp = System.currentTimeMillis();
-        logBuffer.add(log, level, pluginName,logTimestamp,transactionID,null,null,null);
+        logBuffer.add(log, level, pluginName,logTimestamp,transactionID,null,null);
         elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.DEBUG, "Received log: " + log+", pluginName: "+pluginName+". level: "+level);
     }
 
@@ -234,14 +220,15 @@ public class ElasticBuffer extends JavaPlugin {
                 ndjsonBuilder.append("{\"index\":{}}\n");
                 // Dane logu z timestampem zapisanym w momencie odbioru
                 ndjsonBuilder.append(String.format(
-                        "{\"timestamp\":\"%s\",\"plugin\":\"%s\",\"transactionID\":\"%s\",\"level\":\"%s\",\"message\":\"%s\",\"playerName\":\"%s\",\"uuid\":\"%s\"}\n",
+                        "{\"timestamp\":\"%s\",\"plugin\":\"%s\",\"transactionID\":\"%s\",\"level\":\"%s\",\"message\":\"%s\",\"playerName\":\"%s\",\"uuid\":\"%s\",\"serverName\":\"%s\"}\n",
                         java.time.format.DateTimeFormatter.ISO_INSTANT.format(java.time.Instant.ofEpochMilli(logEntry.getTimestamp())),
                         logEntry.getPluginName(),
                         logEntry.getTransactionID(),
                         logEntry.getLevel(),
                         logEntry.getMessage(),
                         logEntry.getPlayerName(),
-                        logEntry.getUuid()
+                        logEntry.getUuid(),
+                        elasticBufferConfigManager.getServerName()
 
                 ));
             }
