@@ -69,33 +69,24 @@ public class ElasticBuffer extends JavaPlugin {
         } else {
             elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.ERROR, "Command 'eb' not found. Check your plugin.yml");
         }
-
-        /*
-        Logger globalLogger = Logger.getLogger("");
-        Logger serverLogger = getServer().getLogger();
-        if (!handlerExists(globalLogger)) {
-            globalLogger.addHandler(new CustomLogHandler(this));
-        }
-        if (!handlerExists(serverLogger)) {
-            serverLogger.addHandler(new CustomLogHandler(this));
-        }
-
-         */
-
-
-
+        Logger logger = Bukkit.getLogger();
+        customLogHandler = new CustomLogHandler(this);
+        logger.addHandler(customLogHandler);
+        getServer().getPluginManager().registerEvents(new EventLogger(api,this), this);
+        // Rejestracja listenera zdarzeń serwerowych
+        getServer().getPluginManager().registerEvents(new ServerEventLogger(api, this), this);
     }
 
 
     @Override
     public void onDisable() {
-        /*
+
         Logger logger = Bukkit.getLogger();
         if (customLogHandler != null) {
             logger.removeHandler(customLogHandler);
         }
 
-         */
+
     }
     public static ElasticBuffer getInstance() {
         Plugin plugin = Bukkit.getPluginManager().getPlugin("ElasticBuffer");
@@ -108,12 +99,12 @@ public class ElasticBuffer extends JavaPlugin {
 
 
 
-    public void receiveLog(String log, String level, String pluginName,String transactionID,String playerName, String uuid) {
+    public synchronized void receiveLog(String log, String level, String pluginName,String transactionID,String playerName, String uuid) {
         long logTimestamp = System.currentTimeMillis();
         logBuffer.add(log, level, pluginName,logTimestamp,transactionID,playerName,uuid);
         elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.DEBUG, "Received log: " + log+", pluginName: "+pluginName+". level: "+level);
     }
-    public void receiveLog(String log, String level, String pluginName,String transactionID) {
+    public synchronized void receiveLog(String log, String level, String pluginName,String transactionID) {
         long logTimestamp = System.currentTimeMillis();
         logBuffer.add(log, level, pluginName,logTimestamp,transactionID,null,null);
         elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.DEBUG, "Received log: " + log+", pluginName: "+pluginName+". level: "+level);
