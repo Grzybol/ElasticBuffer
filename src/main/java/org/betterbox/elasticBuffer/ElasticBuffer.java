@@ -74,7 +74,7 @@ public class ElasticBuffer extends JavaPlugin {
         logger.addHandler(customLogHandler);
         getServer().getPluginManager().registerEvents(new EventLogger(api,this), this);
         // Rejestracja listenera zdarzeń serwerowych
-        getServer().getPluginManager().registerEvents(new ServerEventLogger(api, this), this);
+        getServer().getPluginManager().registerEvents(new ServerEventLogger(api, this,elasticBufferConfigManager), this);
     }
 
 

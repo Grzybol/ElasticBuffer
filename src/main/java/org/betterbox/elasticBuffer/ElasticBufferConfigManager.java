@@ -20,6 +20,12 @@ public class ElasticBufferConfigManager {
     private String webhookURL,apiKey,indexPattern;
     private String truststorePath, truststorePassword,serverName="default-server";
     private boolean useSSL,local=true,authorization=false,checkCerts=false;
+    // New variables for monitoring thresholds
+    private double highMemoryUsageThreshold;
+    private double lowTPSThreshold;
+    private double highCpuUsageThreshold;
+    private double highDiskUsageThreshold;
+    private long monitoringIntervalTicks;
 
 
     public ElasticBufferConfigManager(JavaPlugin plugin, ElasticBufferPluginLogger elasticBufferPluginLogger, String folderPath) {
@@ -297,6 +303,90 @@ public class ElasticBufferConfigManager {
             plugin.getConfig().set("serverName", "default-server-name");
             plugin.saveConfig();
         }
+        // High Memory Usage Threshold
+        if (plugin.getConfig().contains("highMemoryUsageThreshold")) {
+            if (plugin.getConfig().isDouble("highMemoryUsageThreshold")) {
+                highMemoryUsageThreshold = plugin.getConfig().getDouble("highMemoryUsageThreshold");
+            } else {
+                elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.WARNING, "ConfigManager: ReloadConfig: highMemoryUsageThreshold incorrect! Restoring default");
+                highMemoryUsageThreshold = 80.0; // Default value
+                plugin.getConfig().set("highMemoryUsageThreshold", highMemoryUsageThreshold);
+                plugin.saveConfig();
+            }
+        } else {
+            elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.WARNING, "ConfigManager: ReloadConfig: highMemoryUsageThreshold section not found in config! Creating new section...");
+            highMemoryUsageThreshold = 80.0; // Default value
+            plugin.getConfig().set("highMemoryUsageThreshold", highMemoryUsageThreshold);
+            plugin.saveConfig();
+        }
+
+// Low TPS Threshold
+        if (plugin.getConfig().contains("lowTPSThreshold")) {
+            if (plugin.getConfig().isDouble("lowTPSThreshold")) {
+                lowTPSThreshold = plugin.getConfig().getDouble("lowTPSThreshold");
+            } else {
+                elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.WARNING, "ConfigManager: ReloadConfig: lowTPSThreshold incorrect! Restoring default");
+                lowTPSThreshold = 18.0; // Default value
+                plugin.getConfig().set("lowTPSThreshold", lowTPSThreshold);
+                plugin.saveConfig();
+            }
+        } else {
+            elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.WARNING, "ConfigManager: ReloadConfig: lowTPSThreshold section not found in config! Creating new section...");
+            lowTPSThreshold = 18.0; // Default value
+            plugin.getConfig().set("lowTPSThreshold", lowTPSThreshold);
+            plugin.saveConfig();
+        }
+
+// High CPU Usage Threshold
+        if (plugin.getConfig().contains("highCpuUsageThreshold")) {
+            if (plugin.getConfig().isDouble("highCpuUsageThreshold")) {
+                highCpuUsageThreshold = plugin.getConfig().getDouble("highCpuUsageThreshold");
+            } else {
+                elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.WARNING, "ConfigManager: ReloadConfig: highCpuUsageThreshold incorrect! Restoring default");
+                highCpuUsageThreshold = 85.0; // Default value
+                plugin.getConfig().set("highCpuUsageThreshold", highCpuUsageThreshold);
+                plugin.saveConfig();
+            }
+        } else {
+            elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.WARNING, "ConfigManager: ReloadConfig: highCpuUsageThreshold section not found in config! Creating new section...");
+            highCpuUsageThreshold = 85.0; // Default value
+            plugin.getConfig().set("highCpuUsageThreshold", highCpuUsageThreshold);
+            plugin.saveConfig();
+        }
+
+// High Disk Usage Threshold
+        if (plugin.getConfig().contains("highDiskUsageThreshold")) {
+            if (plugin.getConfig().isDouble("highDiskUsageThreshold")) {
+                highDiskUsageThreshold = plugin.getConfig().getDouble("highDiskUsageThreshold");
+            } else {
+                elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.WARNING, "ConfigManager: ReloadConfig: highDiskUsageThreshold incorrect! Restoring default");
+                highDiskUsageThreshold = 90.0; // Default value
+                plugin.getConfig().set("highDiskUsageThreshold", highDiskUsageThreshold);
+                plugin.saveConfig();
+            }
+        } else {
+            elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.WARNING, "ConfigManager: ReloadConfig: highDiskUsageThreshold section not found in config! Creating new section...");
+            highDiskUsageThreshold = 90.0; // Default value
+            plugin.getConfig().set("highDiskUsageThreshold", highDiskUsageThreshold);
+            plugin.saveConfig();
+        }
+
+// Monitoring Interval Ticks
+        if (plugin.getConfig().contains("monitoringIntervalTicks")) {
+            if (plugin.getConfig().isInt("monitoringIntervalTicks") || plugin.getConfig().isLong("monitoringIntervalTicks")) {
+                monitoringIntervalTicks = plugin.getConfig().getLong("monitoringIntervalTicks");
+            } else {
+                elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.WARNING, "ConfigManager: ReloadConfig: monitoringIntervalTicks incorrect! Restoring default");
+                monitoringIntervalTicks = 1200L; // Default value (60 seconds)
+                plugin.getConfig().set("monitoringIntervalTicks", monitoringIntervalTicks);
+                plugin.saveConfig();
+            }
+        } else {
+            elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.WARNING, "ConfigManager: ReloadConfig: monitoringIntervalTicks section not found in config! Creating new section...");
+            monitoringIntervalTicks = 1200L; // Default value
+            plugin.getConfig().set("monitoringIntervalTicks", monitoringIntervalTicks);
+            plugin.saveConfig();
+        }
 
 
         truststorePassword = plugin.getConfig().getString("truststore_password");
@@ -358,5 +448,25 @@ public class ElasticBufferConfigManager {
     public String getServerName() {
         return serverName;
     }
+    public double getHighMemoryUsageThreshold() {
+        return highMemoryUsageThreshold;
+    }
+
+    public double getLowTPSThreshold() {
+        return lowTPSThreshold;
+    }
+
+    public double getHighCpuUsageThreshold() {
+        return highCpuUsageThreshold;
+    }
+
+    public double getHighDiskUsageThreshold() {
+        return highDiskUsageThreshold;
+    }
+
+    public long getMonitoringIntervalTicks() {
+        return monitoringIntervalTicks;
+    }
+
 }
 
