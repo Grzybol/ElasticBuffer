@@ -1,11 +1,13 @@
 package org.betterbox.elasticBuffer;
 
+import org.apache.logging.log4j.core.net.Priority;
 import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.block.Block;
 import org.bukkit.entity.LivingEntity;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.EventHandler;
 import org.bukkit.entity.Entity;
@@ -29,6 +31,7 @@ import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.metadata.FixedMetadataValue;
 import org.bukkit.plugin.Plugin;
 
+import javax.management.monitor.Monitor;
 import java.util.EnumSet;
 import java.util.Set;
 import java.util.UUID;
@@ -55,6 +58,7 @@ public class EventLogger implements Listener {
         return entity.hasMetadata(key);
     }
 
+    //@EventHandler(priority = EventPriority.MONITOR)
     @EventHandler
     public void onPlayerJoin(PlayerJoinEvent event) {
         if (hasMetadata(event.getPlayer(), "eventPlayerJoinHandled")) {
@@ -179,7 +183,7 @@ public class EventLogger implements Listener {
         setTemporaryMetadata(event.getPlayer(), "eventPlayerChatHandled", 1L);
 
         // AsyncPlayerChatEvent is already asynchronous
-        api.log(event.getPlayer().getName() + ": " + event.getMessage(), "INFO", "EventLogger", null,
+        api.log(event.getPlayer().getName() + ": " + event.getMessage(), "CHAT", "EventLogger", null,
                 event.getPlayer().getName(), event.getPlayer().getUniqueId().toString());
     }
 
