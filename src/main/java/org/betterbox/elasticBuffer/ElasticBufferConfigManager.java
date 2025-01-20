@@ -389,6 +389,7 @@ public class ElasticBufferConfigManager {
         }
 
 
+
         truststorePassword = plugin.getConfig().getString("truststore_password");
         // Logowanie konfiguracji dla debugowania
         elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.DEBUG, "ConfigManager.ReloadConfig: useSSL: " + useSSL+", port: "+port+", authorization: "+authorization+", webhook: "+webhookURL+", local: "+local+", apiKey: "+apiKey+", index_pattern: "+indexPattern+", checkCerts: "+checkCerts);

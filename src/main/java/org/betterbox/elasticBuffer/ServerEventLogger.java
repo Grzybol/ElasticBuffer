@@ -1,6 +1,7 @@
 package org.betterbox.elasticBuffer;
 
 import org.bukkit.Bukkit;
+import org.bukkit.command.ConsoleCommandSender;
 import org.bukkit.event.Listener;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.server.ServerLoadEvent;
@@ -10,20 +11,24 @@ import org.bukkit.event.world.PortalCreateEvent;
 import org.bukkit.command.BlockCommandSender;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.scheduler.BukkitRunnable;
+import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 
 import java.lang.management.ManagementFactory;
 import java.lang.management.OperatingSystemMXBean;
+import java.util.logging.*;
 
 public class ServerEventLogger implements Listener {
     private final ElasticBufferAPI api;
     private final Plugin plugin;
     private final ElasticBufferConfigManager configManager;
+    private final Logger logger = Logger.getLogger("Minecraft");
 
     public ServerEventLogger(ElasticBufferAPI api, Plugin plugin, ElasticBufferConfigManager configManager) {
         this.api = api;
         this.plugin = plugin;
         this.configManager = configManager;
         startMonitoring();
+        startConsoleMonitoring();
     }
 
     // Server start event
@@ -48,6 +53,56 @@ public class ServerEventLogger implements Listener {
         Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
             api.log("RCON command executed: " + event.getCommand(), "INFO", "ServerEventLogger", null, "RCON", "N/A");
         });
+    }
+    // Player command preprocess event
+    @EventHandler
+    public void onPlayerCommandPreprocess(PlayerCommandPreprocessEvent event) {
+        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+            api.log("Player command executed: " + event.getMessage(), "INFO", "ServerEventLogger", event.getPlayer().getName(), "Player", "N/A");
+        });
+    }
+
+    // Monitoring method for console logs
+    private void startConsoleMonitoring() {
+        // Znajdź głównego loggera Minecrafta
+        Logger logger = Logger.getLogger("");
+
+        // Utwórz niestandardowy handler
+        Handler handler = new Handler() {
+            @Override
+            public void publish(LogRecord record) {
+                // Construct log message
+                String logMessage = record.getMessage();
+                String logLevel = record.getLevel().getName();
+                String loggerName = record.getLoggerName();
+                String sourceClassName = record.getSourceClassName();
+                String sourceMethodName = record.getSourceMethodName();
+
+                // Send log to ElasticBufferAPI asynchronously
+                new BukkitRunnable() {
+                    @Override
+                    public void run() {
+                        api.log(logMessage, logLevel, loggerName, sourceClassName, sourceMethodName, "Console");
+                    }
+                }.runTaskAsynchronously(plugin);
+            }
+
+            @Override
+            public void flush() {
+                // No-op
+            }
+
+            @Override
+            public void close() throws SecurityException {
+                // No-op
+            }
+        };
+
+        // Ustaw poziom handlera na ALL, aby przechwytywał wszystkie poziomy logowania
+        handler.setLevel(Level.ALL);
+
+        // Dodaj niestandardowy handler do loggera
+        logger.addHandler(handler);
     }
 
     // Command block command event

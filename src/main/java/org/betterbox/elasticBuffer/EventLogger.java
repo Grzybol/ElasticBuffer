@@ -183,7 +183,7 @@ public class EventLogger implements Listener {
         setTemporaryMetadata(event.getPlayer(), "eventPlayerChatHandled", 1L);
 
         // AsyncPlayerChatEvent is already asynchronous
-        api.log(event.getPlayer().getName() + ": " + event.getMessage(), "CHAT", "EventLogger", null,
+        api.log("CHAT:"+  event.getMessage(), "CHAT", "EventLogger", null,
                 event.getPlayer().getName(), event.getPlayer().getUniqueId().toString());
     }
 
