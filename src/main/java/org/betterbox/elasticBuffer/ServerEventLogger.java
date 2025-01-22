@@ -1,6 +1,8 @@
 package org.betterbox.elasticBuffer;
 
+import org.apache.logging.log4j.core.Appender;
 import org.bukkit.Bukkit;
+import org.bukkit.command.ConsoleCommandSender;
 import org.bukkit.event.Listener;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.server.ServerLoadEvent;
@@ -10,21 +12,96 @@ import org.bukkit.event.world.PortalCreateEvent;
 import org.bukkit.command.BlockCommandSender;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.scheduler.BukkitRunnable;
+import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 
+import java.io.*;
 import java.lang.management.ManagementFactory;
 import java.lang.management.OperatingSystemMXBean;
-
+import java.util.Enumeration;
+import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.logging.*;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.core.LogEvent;
+import org.apache.logging.log4j.core.Logger;
+import org.apache.logging.log4j.core.appender.AbstractAppender;
 public class ServerEventLogger implements Listener {
     private final ElasticBufferAPI api;
     private final Plugin plugin;
     private final ElasticBufferConfigManager configManager;
+    //private final Logger logger = Logger.getLogger("Minecraft");
+    private PrintStream originalOut;
+    private PrintStream originalErr;
+    private final AtomicInteger recentRateLimit = new AtomicInteger(0);
+    private final AtomicInteger totalBackoffEvents = new AtomicInteger(0);
+    private final AtomicLong lastRateLimitTime = new AtomicLong(0);
+    private final ConcurrentLinkedQueue<String> messageQueue = new ConcurrentLinkedQueue<>();
+
 
     public ServerEventLogger(ElasticBufferAPI api, Plugin plugin, ElasticBufferConfigManager configManager) {
         this.api = api;
         this.plugin = plugin;
         this.configManager = configManager;
         startMonitoring();
+        //startConsoleMonitoring();
     }
+
+
+    public void startConsoleMonitoring() {
+        Logger rootLogger = (Logger) LogManager.getRootLogger();
+
+        Appender appender = new AbstractAppender("ConsoleAppender", null, null, true, null) {
+            @Override
+            public void append(LogEvent event) {
+                String message = event.getMessage().getFormattedMessage();
+                String level = event.getLevel().toString();
+                String loggerName = event.getLoggerName();
+                String sourceClassName = event.getSource().getClassName();
+                String sourceMethodName = event.getSource().getMethodName();
+
+                // Jeśli jest wyjątek, pobierz stacktrace
+                final String throwableString;
+                if (event.getThrown() != null) {
+                    StringWriter sw = new StringWriter();
+                    event.getThrown().printStackTrace(new PrintWriter(sw));
+                    throwableString = sw.toString();
+                } else {
+                    throwableString = null;
+                }
+
+                // Dodaj wiadomość do kolejki
+                messageQueue.add(message + " " + (throwableString != null ? throwableString : ""));
+            }
+        };
+
+        // Dodajemy appender do loggera root
+        ((org.apache.logging.log4j.core.Logger) rootLogger).addAppender(appender);
+
+        // Zadanie asynchroniczne do przetwarzania kolejki wiadomości
+        Bukkit.getScheduler().runTaskTimerAsynchronously(plugin, () -> {
+
+            final StringBuilder buffer = new StringBuilder();
+            String curLine;
+            while ((curLine = messageQueue.peek()) != null) {
+                if (buffer.length() + curLine.length() > 2000 - 2) { // Ustal limit długości wiadomości
+                    api.log(buffer.toString(), "INFO", "Console", "", "", "Console");
+                    buffer.setLength(0);
+                    continue;
+                }
+                buffer.append("\n").append(messageQueue.poll());
+            }
+            if (buffer.length() != 0) {
+                api.log(buffer.toString(), "INFO", "Console", "", "", "Console");
+            }
+        }, 20, 20 * 5);
+    }
+
+
+
+
+
 
     // Server start event
     @EventHandler
@@ -48,6 +125,180 @@ public class ServerEventLogger implements Listener {
         Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
             api.log("RCON command executed: " + event.getCommand(), "INFO", "ServerEventLogger", null, "RCON", "N/A");
         });
+    }
+    // Player command preprocess event
+    @EventHandler
+    public void onPlayerCommandPreprocess(PlayerCommandPreprocessEvent event) {
+        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+            api.log("Player command executed: " + event.getMessage(), "INFO", "ServerEventLogger", event.getPlayer().getName(), "Player", "N/A");
+        });
+    }
+
+    /*
+    // Monitoring method for console logs
+    private void startConsoleMonitoringOld() {
+        // logManager = LogManager.getLogManager();
+        //Logger rootLogger = logManager.getLogger("");
+        //((Logger) LogManager.getRootLogger()).addAppender(this);
+        //Logger rootLogger = (Logger) LogManager.getRootLogger();
+        //Logger rootLogger = (Logger) LogManager.getLogManager().getLogger(Logger.GLOBAL_LOGGER_NAME);
+        // Utwórz niestandardowy handler
+        Handler handler = new Handler() {
+            @Override
+            public void publish(LogRecord record) {
+                if (!isLoggable(record)) {
+                    return;
+                }
+
+                // Podstawowe pola
+                String message = record.getMessage();
+                String level = record.getLevel().getName();
+                String loggerName = record.getLoggerName();
+                String sourceClassName = record.getSourceClassName();
+                String sourceMethodName = record.getSourceMethodName();
+
+                // Jeśli jest wyjątek, pobierz stacktrace
+                final String throwableString;
+                if (record.getThrown() != null) {
+                    StringWriter sw = new StringWriter();
+                    record.getThrown().printStackTrace(new PrintWriter(sw));
+                    throwableString = sw.toString();
+                } else {
+                    throwableString = null;
+                }
+
+                // Wyślij asynchronicznie do API
+                new BukkitRunnable() {
+                    @Override
+                    public void run() {
+                        api.log(message+" "+ throwableString, level, loggerName, sourceClassName, sourceMethodName, "Console");
+                    }
+                }.runTaskAsynchronously(plugin);
+            }
+
+            @Override
+            public void flush() { }
+
+            @Override
+            public void close() throws SecurityException { }
+        };
+
+        handler.setLevel(Level.ALL);
+        rootLogger.addHandler(handler);
+
+        // Filtr, który zawsze przepuszcza
+        rootLogger.setFilter(new Filter() {
+            @Override
+            public boolean isLoggable(LogRecord record) {
+                return true;
+            }
+        });
+
+        // Dodaj handler do wszystkich loggerów w JUL
+        attachHandlersToAllLoggers(handler);
+
+        // Hook na System.out i System.err
+        hookSystemOutAndErr();
+    }
+
+    private void attachHandlersToAllLoggers(Handler handler) {
+        LogManager manager = LogManager.getLogManager();
+        Enumeration<String> loggerNames = manager.getLoggerNames();
+
+        while (loggerNames.hasMoreElements()) {
+            String name = loggerNames.nextElement();
+            Logger logger = manager.getLogger(name);
+
+            if (logger != null) {
+                boolean alreadyAttached = false;
+                for (Handler h : logger.getHandlers()) {
+                    if (h == handler) {
+                        alreadyAttached = true;
+                        break;
+                    }
+                }
+
+                if (!alreadyAttached) {
+                    logger.addHandler(handler);
+                }
+            }
+        }
+    }
+
+     */
+
+
+    class CustomHandler extends Handler {
+        @Override
+        public void publish(LogRecord record) {
+            // Przetwarzanie logów (podobnie jak w startConsoleMonitoring)
+        }
+
+        @Override
+        public void flush() { }
+
+        @Override
+        public void close() throws SecurityException { }
+    }
+
+    public void hookSystemOutAndErr() {
+        originalOut = System.out;
+        originalErr = System.err;
+
+        System.setOut(new PrintStream(new OutputStream() {
+            private StringBuilder buffer = new StringBuilder();
+
+            @Override
+            public void write(int b) throws IOException {
+                if (b == '\n') {
+                    String line = buffer.toString();
+                    buffer.setLength(0);
+                    logLine(line, "INFO", "System.out");
+                } else {
+                    buffer.append((char) b);
+                }
+            }
+        }));
+
+        System.setErr(new PrintStream(new OutputStream() {
+            private StringBuilder buffer = new StringBuilder();
+
+            @Override
+            public void write(int b) throws IOException {
+                if (b == '\n') {
+                    String line = buffer.toString();
+                    buffer.setLength(0);
+                    logLine(line, "ERROR", "System.err");
+                } else {
+                    buffer.append((char) b);
+                }
+            }
+        }));
+    }
+
+    private void logLine(String line, String level, String source) {
+        new BukkitRunnable() {
+            @Override
+            public void run() {
+                api.log(line, level, source, null, null, "Console");
+            }
+        }.runTaskAsynchronously(plugin);
+
+        // Wyświetlenie w konsoli
+        if ("System.out".equals(source)) {
+            originalOut.println(line);
+        } else {
+            originalErr.println(line);
+        }
+    }
+
+    public void restoreSystemOutAndErr() {
+        if (originalOut != null) {
+            System.setOut(originalOut);
+        }
+        if (originalErr != null) {
+            System.setErr(originalErr);
+        }
     }
 
     // Command block command event
