@@ -2,6 +2,7 @@ package org.betterbox.elasticBuffer;
 
 import org.bstats.bukkit.Metrics;
 import org.bukkit.Bukkit;
+import org.bukkit.Server;
 import org.bukkit.command.PluginCommand;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.ServicePriority;
@@ -18,6 +19,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.KeyManagementException;
 import java.security.KeyStore;
 import java.security.NoSuchAlgorithmException;
+import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
@@ -35,6 +37,8 @@ public class ElasticBuffer extends JavaPlugin {
     private ElasticBufferPluginLogger elasticBufferPluginLogger;
     ElasticBufferConfigManager elasticBufferConfigManager;
     private CustomLogHandler customLogHandler;
+    private ServerEventLogger serverEventLogger;
+    private CustomConsoleInjector consoleInjector;
 
     @Override
     public void onEnable() {
@@ -74,13 +78,20 @@ public class ElasticBuffer extends JavaPlugin {
         logger.addHandler(customLogHandler);
         getServer().getPluginManager().registerEvents(new EventLogger(api,this), this);
         // Rejestracja listenera zdarzeń serwerowych
+        serverEventLogger = new ServerEventLogger(api, this,elasticBufferConfigManager);
         getServer().getPluginManager().registerEvents(new ServerEventLogger(api, this,elasticBufferConfigManager), this);
+
+        elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.ERROR, "Starting consoleInjector");
+        consoleInjector = new CustomConsoleInjector(this, api);
+        elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.ERROR, "consoleInjector started");
+
+
     }
 
 
     @Override
     public void onDisable() {
-
+        serverEventLogger.restoreSystemOutAndErr();
         Logger logger = Bukkit.getLogger();
         if (customLogHandler != null) {
             logger.removeHandler(customLogHandler);
@@ -213,60 +224,61 @@ public class ElasticBuffer extends JavaPlugin {
             elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.DEBUG, "Read Timeout: " + connection.getReadTimeout());
             elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.DEBUG, "Using Proxy: " + (connection.usingProxy() ? "Yes" : "No"));
 
-            // Tworzymy NDJSON (newline-delimited JSON) dla operacji bulk
-            StringBuilder ndjsonBuilder = new StringBuilder();
-            for (LogEntry logEntry : logsToSend) {
-                // Linia metadanych dla akcji index
-                ndjsonBuilder.append("{\"index\":{}}\n");
-                // Dane logu z timestampem zapisanym w momencie odbioru
-                ndjsonBuilder.append(String.format(
-                        "{\"timestamp\":\"%s\",\"plugin\":\"%s\",\"transactionID\":\"%s\",\"level\":\"%s\",\"message\":\"%s\",\"playerName\":\"%s\",\"uuid\":\"%s\",\"serverName\":\"%s\"}\n",
-                        java.time.format.DateTimeFormatter.ISO_INSTANT.format(java.time.Instant.ofEpochMilli(logEntry.getTimestamp())),
-                        logEntry.getPluginName(),
-                        logEntry.getTransactionID(),
-                        logEntry.getLevel(),
-                        logEntry.getMessage(),
-                        logEntry.getPlayerName(),
-                        logEntry.getUuid(),
-                        elasticBufferConfigManager.getServerName()
-
-                ));
-            }
-
-            // Wysyłanie logów
+            //DO WYJEBY MOZE
             try (OutputStream os = connection.getOutputStream()) {
-                String ndjsonContent = ndjsonBuilder.toString();
-                byte[] input = ndjsonBuilder.toString().getBytes(StandardCharsets.UTF_8);
-                os.write(input, 0, input.length);
-                elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.DEBUG, "Sending NDJSON: " + ndjsonContent);
+                for (LogEntry logEntry : logsToSend) {
+                    List<String> messageChunks = splitMessage(logEntry.getMessage());
+                    for (String chunk : messageChunks) {
+                        // Podział dużych wiadomości
+                        if (chunk.length() > 30 * 1024) {
+                            int chunkSize = 30 * 1024;
+                            for (int i = 0; i < chunk.length(); i += chunkSize) {
+                                String subChunk = chunk.substring(i, Math.min(chunk.length(), i + chunkSize));
+                                String ndjsonChunk = buildNdjsonChunk(logEntry, subChunk);
+                                byte[] input = ndjsonChunk.getBytes(StandardCharsets.UTF_8);
+                                os.write(input, 0, input.length);
+                                elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.DEBUG, "Sending NDJSON chunk: " + ndjsonChunk);
+                            }
+                        } else {
+                            String ndjson = buildNdjsonChunk(logEntry, chunk);
+                            byte[] input = ndjson.getBytes(StandardCharsets.UTF_8);
+                            os.write(input, 0, input.length);
+                            elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.DEBUG, "Sending NDJSON: " + ndjson);
+                        }
+                    }
+                }
             }
-
 
             int responseCode = connection.getResponseCode();
-            elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.DEBUG, "Elasticsearch responseCode: "+responseCode);
-        }catch (Exception e) {
+            elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.DEBUG, "Elasticsearch responseCode: " + responseCode + ", getResponseMessage: " + connection.getResponseMessage());
+        } catch (Exception e) {
             getLogger().severe("Error sending logs to Elasticsearch: " + e.getMessage());
             elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.ERROR, "Error sending logs to Elasticsearch: " + e.getMessage());
         }
-
-
-
+    }
+    private List<String> splitMessage(String message) {
+        return Arrays.asList(message.split("\n"));
     }
 
-    private String buildNdjson() {
-        List<LogEntry> logsToSend = logBuffer.getAndClear();
+    private String buildNdjsonChunk(LogEntry logEntry, String messageChunk) {
+        String sanitizedMessage = sanitizeMessage(messageChunk);
         StringBuilder ndjsonBuilder = new StringBuilder();
-        for (LogEntry logEntry : logsToSend) {
-            ndjsonBuilder.append("{\"index\":{}}\n");
-            ndjsonBuilder.append(String.format(
-                    "{\"timestamp\":\"%s\",\"plugin\":\"%s\",\"transactionID\":\"%s\",\"level\":\"%s\",\"message\":\"%s\"}\n",
-                    java.time.format.DateTimeFormatter.ISO_INSTANT.format(java.time.Instant.ofEpochMilli(logEntry.getTimestamp())),
-                    logEntry.getPluginName(),
-                    logEntry.getTransactionID(),
-                    logEntry.getLevel(),
-                    logEntry.getMessage()
-            ));
-        }
+        ndjsonBuilder.append("{\"index\":{}}\n");
+        ndjsonBuilder.append(String.format(
+                "{\"timestamp\":\"%s\",\"plugin\":\"%s\",\"transactionID\":\"%s\",\"level\":\"%s\",\"message\":\"%s\",\"playerName\":\"%s\",\"uuid\":\"%s\",\"serverName\":\"%s\"}\n",
+                java.time.format.DateTimeFormatter.ISO_INSTANT.format(java.time.Instant.ofEpochMilli(logEntry.getTimestamp())),
+                logEntry.getPluginName(),
+                logEntry.getTransactionID(),
+                logEntry.getLevel(),
+                sanitizedMessage,
+                logEntry.getPlayerName(),
+                logEntry.getUuid(),
+                elasticBufferConfigManager.getServerName()
+        ));
         return ndjsonBuilder.toString();
+    }
+    private String sanitizeMessage(String message) {
+        // Usuwanie znaku przejścia do nowej linii i cudzysłowu
+        return message.replace("\"", "");
     }
 }
