@@ -20,4 +20,10 @@ public class ElasticBufferAPI {
             elasticBuffer.receiveLog(message, level, pluginName,transactionID);
         }
     }
+    public void log(String message, String level, String pluginName, String transactionID,String playerName,String uuid,double keyValue) {
+        if (elasticBuffer != null) {
+            elasticBuffer.receiveLog(message, level, pluginName,transactionID,playerName,uuid,keyValue);
+        }
+
+    }
 }
