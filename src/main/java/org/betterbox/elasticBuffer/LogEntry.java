@@ -10,7 +10,8 @@ public class LogEntry {
     private final String transactionID;
     private final String playerName;
     private final String uuid;
-    public LogEntry(String message, String level,String pluginName, long timestamp,String transactionID,String playerName, String uuid) {
+    private final double keyValue;
+    public LogEntry(String message, String level,String pluginName, long timestamp,String transactionID,String playerName, String uuid, double keyValue) {
         this.message = message;
         this.level = level;
         this.timestamp = timestamp;
@@ -18,6 +19,7 @@ public class LogEntry {
         this.transactionID = (transactionID != null) ? transactionID : "N/A";
         this.playerName = (playerName != null) ? playerName : "N/A";
         this.uuid = (uuid != null) ? uuid : "N/A";
+        this.keyValue = keyValue;
     }
     public String getMessage() {
         return message;
@@ -36,6 +38,9 @@ public class LogEntry {
     }
     public long getTimestamp() {
         return timestamp; // Getter dla znacznika czasu
+    }
+    public double getKeyValue() {
+        return keyValue;
     }
 
     @Override

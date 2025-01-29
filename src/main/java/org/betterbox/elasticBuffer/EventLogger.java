@@ -1,5 +1,6 @@
 package org.betterbox.elasticBuffer;
 
+import net.ess3.api.events.UserBalanceUpdateEvent;
 import org.apache.logging.log4j.core.net.Priority;
 import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
@@ -574,4 +575,19 @@ public class EventLogger implements Listener {
                     "EventLogger", null, player.getName(), player.getUniqueId().toString());
         });
     }
+    @EventHandler
+    public void onBalanceUpdate(UserBalanceUpdateEvent event) {
+        // Pobierz gracza, którego balans został zmieniony
+        String playerName = event.getPlayer().getName();
+        double oldBalance = event.getOldBalance().toBigInteger().doubleValue();
+        double newBalance = event.getNewBalance().toBigInteger().doubleValue();
+        double difference = newBalance - oldBalance;
+
+        // Logowanie zmiany balansu
+        api.log("balance changed by " + difference,
+                "INFO", "Economy", null, playerName, event.getPlayer().getUniqueId().toString(), difference);
+        api.log("Player " + playerName + " balance: " + newBalance,
+                "INFO", "Economy", null, playerName, event.getPlayer().getUniqueId().toString(), newBalance);
+    }
+
 }

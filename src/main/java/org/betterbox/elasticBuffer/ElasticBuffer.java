@@ -112,12 +112,17 @@ public class ElasticBuffer extends JavaPlugin {
 
     public synchronized void receiveLog(String log, String level, String pluginName,String transactionID,String playerName, String uuid) {
         long logTimestamp = System.currentTimeMillis();
-        logBuffer.add(log, level, pluginName,logTimestamp,transactionID,playerName,uuid);
+        logBuffer.add(log, level, pluginName,logTimestamp,transactionID,playerName,uuid,0);
         elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.DEBUG, "Received log: " + log+", pluginName: "+pluginName+". level: "+level);
     }
     public synchronized void receiveLog(String log, String level, String pluginName,String transactionID) {
         long logTimestamp = System.currentTimeMillis();
-        logBuffer.add(log, level, pluginName,logTimestamp,transactionID,null,null);
+        logBuffer.add(log, level, pluginName,logTimestamp,transactionID,null,null,0);
+        elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.DEBUG, "Received log: " + log+", pluginName: "+pluginName+". level: "+level);
+    }
+    public synchronized void receiveLog(String log, String level, String pluginName,String transactionID,String playerName, String uuid, double keyValue) {
+        long logTimestamp = System.currentTimeMillis();
+        logBuffer.add(log, level, pluginName,logTimestamp,transactionID,playerName,uuid,keyValue);
         elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.DEBUG, "Received log: " + log+", pluginName: "+pluginName+". level: "+level);
     }
 
@@ -230,8 +235,8 @@ public class ElasticBuffer extends JavaPlugin {
                     List<String> messageChunks = splitMessage(logEntry.getMessage());
                     for (String chunk : messageChunks) {
                         // Podział dużych wiadomości
-                        if (chunk.length() > 30 * 1024) {
-                            int chunkSize = 30 * 1024;
+                        if (chunk.length() > 31 * 1024) {
+                            int chunkSize = 31 * 1024;
                             for (int i = 0; i < chunk.length(); i += chunkSize) {
                                 String subChunk = chunk.substring(i, Math.min(chunk.length(), i + chunkSize));
                                 String ndjsonChunk = buildNdjsonChunk(logEntry, subChunk);
@@ -265,7 +270,7 @@ public class ElasticBuffer extends JavaPlugin {
         StringBuilder ndjsonBuilder = new StringBuilder();
         ndjsonBuilder.append("{\"index\":{}}\n");
         ndjsonBuilder.append(String.format(
-                "{\"timestamp\":\"%s\",\"plugin\":\"%s\",\"transactionID\":\"%s\",\"level\":\"%s\",\"message\":\"%s\",\"playerName\":\"%s\",\"uuid\":\"%s\",\"serverName\":\"%s\"}\n",
+                "{\"timestamp\":\"%s\",\"plugin\":\"%s\",\"transactionID\":\"%s\",\"level\":\"%s\",\"message\":\"%s\",\"playerName\":\"%s\",\"uuid\":\"%s\",\"serverName\":\"%s\",\"keyValue\":\"%.5f\"}\n",
                 java.time.format.DateTimeFormatter.ISO_INSTANT.format(java.time.Instant.ofEpochMilli(logEntry.getTimestamp())),
                 logEntry.getPluginName(),
                 logEntry.getTransactionID(),
@@ -273,7 +278,8 @@ public class ElasticBuffer extends JavaPlugin {
                 sanitizedMessage,
                 logEntry.getPlayerName(),
                 logEntry.getUuid(),
-                elasticBufferConfigManager.getServerName()
+                elasticBufferConfigManager.getServerName(),
+                logEntry.getKeyValue()
         ));
         return ndjsonBuilder.toString();
     }
