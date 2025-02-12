@@ -458,7 +458,7 @@ public class EventLogger implements Listener {
         });
     }
 
-    @EventHandler
+    @EventHandler(priority = EventPriority.MONITOR)
     public void onEntityDamageByEntity(EntityDamageByEntityEvent event) {
         Entity damager = event.getDamager();
 
@@ -501,13 +501,16 @@ public class EventLogger implements Listener {
                     weaponUsed = attacker.getInventory().getItemInMainHand().getType().toString();
                 }
 
+
                 String logMessage = String.format(
-                        "%s damaged %s for %.2f damage using %s from a distance of %.2f blocks.",
+                        "%s damaged %s for %.2f damage using %s from a distance of %.2f blocks. Attacker location: %s, Victim location: %s",
                         attacker.getName(),
                         victimName,
                         event.getFinalDamage(),
                         weaponUsed,
-                        distance
+                        distance,
+                        attacker.getLocation().toString(),
+                        event.getEntity().getLocation().toString()
                 );
 
                 api.log(
@@ -516,7 +519,8 @@ public class EventLogger implements Listener {
                         "EventLogger",
                         null,
                         attacker.getName(),
-                        attacker.getUniqueId().toString()
+                        attacker.getUniqueId().toString(),
+                        distance
                 );
             }
         });

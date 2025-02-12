@@ -130,7 +130,7 @@ public class ServerEventLogger implements Listener {
     @EventHandler
     public void onPlayerCommandPreprocess(PlayerCommandPreprocessEvent event) {
         Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
-            api.log("Player command executed: " + event.getMessage(), "INFO", "ServerEventLogger", event.getPlayer().getName(), "Player", "N/A");
+            api.log("Player command executed: " + event.getMessage(), "INFO", "ServerEventLogger","N/A" , event.getPlayer().getName(), event.getPlayer().getUniqueId().toString());
         });
     }
 
