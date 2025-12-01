@@ -1,5 +1,8 @@
 package org.betterbox.elasticBuffer;
-import org.betterbox.elasticBuffer.ElasticBuffer;
+
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 
 public class ElasticBufferAPI {
     private final ElasticBuffer elasticBuffer;
@@ -11,19 +14,27 @@ public class ElasticBufferAPI {
     }
 
     public void log(String message, String level, String pluginName, String transactionID,String playerName,String uuid) {
-        if (elasticBuffer != null) {
-            elasticBuffer.receiveLog(message, level, pluginName,transactionID,playerName,uuid);
-        }
+        log(message, level, pluginName, transactionID, playerName, uuid, Collections.emptyMap());
     }
     public void log(String message, String level, String pluginName, String transactionID) {
-        if (elasticBuffer != null) {
-            elasticBuffer.receiveLog(message, level, pluginName,transactionID);
-        }
+        log(message, level, pluginName, transactionID, "N/A", "N/A", Collections.emptyMap());
     }
     public void log(String message, String level, String pluginName, String transactionID,String playerName,String uuid,double keyValue) {
-        if (elasticBuffer != null) {
-            elasticBuffer.receiveLog(message, level, pluginName,transactionID,playerName,uuid,keyValue);
-        }
+        Map<String,Object> additionalFields = new HashMap<>();
+        additionalFields.put("keyValue", keyValue);
+        log(message, level, pluginName, transactionID, playerName, uuid, additionalFields);
 
+    }
+
+    public void log(String message,
+                    String level,
+                    String pluginName,
+                    String transactionID,
+                    String playerName,
+                    String uuid,
+                    Map<String, Object> additionalFields) {
+        if (elasticBuffer != null) {
+            elasticBuffer.receiveLog(message, level, pluginName, transactionID, playerName, uuid, additionalFields);
+        }
     }
 }

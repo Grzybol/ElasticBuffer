@@ -34,6 +34,8 @@ import org.bukkit.plugin.Plugin;
 
 import javax.management.monitor.Monitor;
 import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -513,6 +515,17 @@ public class EventLogger implements Listener {
                         event.getEntity().getLocation().toString()
                 );
 
+                Map<String, Object> additionalFields = new HashMap<>();
+                additionalFields.put("distance", distance);
+                additionalFields.put("weaponUsed", weaponUsed);
+                additionalFields.put("attackerPing", attacker.getPing());
+                additionalFields.put("finalDamage", event.getFinalDamage());
+
+                if (event.getEntity() instanceof Player) {
+                    Player victimPlayer = (Player) event.getEntity();
+                    additionalFields.put("victimPing", victimPlayer.getPing());
+                }
+
                 api.log(
                         logMessage,
                         "INFO",
@@ -520,7 +533,7 @@ public class EventLogger implements Listener {
                         null,
                         attacker.getName(),
                         attacker.getUniqueId().toString(),
-                        distance
+                        additionalFields
                 );
             }
         });
@@ -588,10 +601,19 @@ public class EventLogger implements Listener {
         double difference = newBalance - oldBalance;
 
         // Logowanie zmiany balansu
+        Map<String, Object> balanceChangeFields = new HashMap<>();
+        balanceChangeFields.put("difference", difference);
+        balanceChangeFields.put("oldBalance", oldBalance);
+        balanceChangeFields.put("newBalance", newBalance);
+
         api.log("balance changed by " + difference,
-                "INFO", "Economy", null, playerName, event.getPlayer().getUniqueId().toString(), difference);
+                "INFO", "Economy", null, playerName, event.getPlayer().getUniqueId().toString(), balanceChangeFields);
+
+        Map<String, Object> balanceStateFields = new HashMap<>();
+        balanceStateFields.put("balance", newBalance);
+
         api.log("Player " + playerName + " balance: " + newBalance,
-                "INFO", "Economy", null, playerName, event.getPlayer().getUniqueId().toString(), newBalance);
+                "INFO", "Economy", null, playerName, event.getPlayer().getUniqueId().toString(), balanceStateFields);
     }
 
 }
