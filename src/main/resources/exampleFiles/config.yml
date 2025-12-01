@@ -14,4 +14,17 @@ index_pattern: yourIndexPattern
 truststore_path: pathToCertFromYourElasticServer
 truststore_password: yourPassword
 
+anti-cheat:
+  enabled: true
+  violation-history-seconds: 120
+  thresholds:
+    - severityMin: 5
+      countMin: 2
+      windowSeconds: 45
+      command: "warn %player_name% [Reach] severity=%severity% count=%count%"
+    - severityMin: 7
+      countMin: 3
+      windowSeconds: 90
+      command: "kick %player_name% Excessive violations (%check_type%)"
+
 
