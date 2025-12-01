@@ -86,7 +86,7 @@ public class ElasticBuffer extends JavaPlugin {
         Logger logger = Bukkit.getLogger();
         customLogHandler = new CustomLogHandler(this);
         logger.addHandler(customLogHandler);
-        getServer().getPluginManager().registerEvents(new EventLogger(api,this), this);
+        getServer().getPluginManager().registerEvents(new EventLogger(api,this, elasticBufferConfigManager, antiCheatManager), this);
         // Rejestracja listenera zdarzeń serwerowych
         serverEventLogger = new ServerEventLogger(api, this,elasticBufferConfigManager);
         getServer().getPluginManager().registerEvents(new ServerEventLogger(api, this,elasticBufferConfigManager), this);

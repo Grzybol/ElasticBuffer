@@ -17,6 +17,18 @@ truststore_password: yourPassword
 anti-cheat:
   enabled: true
   violation-history-seconds: 120
+  checks:
+    reach:
+      warning-distance: 4.0
+      critical-distance: 5.0
+      warning-severity: 6
+      critical-severity: 7
+    kill-aura:
+      line-of-sight-severity: 6
+      same-tick-hit-severity: 6.5
+      max-hits-per-tick: 1
+      switch-interval-ms: 50
+      switch-violation-severity: 6.5
   thresholds:
     - severityMin: 5
       countMin: 2
