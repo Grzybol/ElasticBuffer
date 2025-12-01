@@ -31,6 +31,7 @@ import org.bukkit.event.player.PlayerRegisterChannelEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.metadata.FixedMetadataValue;
 import org.bukkit.plugin.Plugin;
+import org.bukkit.util.Vector;
 
 import javax.management.monitor.Monitor;
 import java.util.EnumSet;
@@ -488,6 +489,7 @@ public class EventLogger implements Listener {
                 String victimUUID = null;
                 double distance = 0.0;
                 String weaponUsed = "Unknown";
+                double aimAngle = 0.0;
 
                 if (event.getEntity() instanceof Player) {
                     Player victim = (Player) event.getEntity();
@@ -499,18 +501,33 @@ public class EventLogger implements Listener {
                     distance = attacker.getLocation().distance(event.getEntity().getLocation());
                 }
 
+                Vector attackerDirection = attacker.getLocation().getDirection().normalize();
+                Vector toVictimVector = event.getEntity().getLocation().toVector().subtract(attacker.getLocation().toVector());
+                if (toVictimVector.lengthSquared() > 0) {
+                    Vector toVictim = toVictimVector.normalize();
+                    double dotProduct = Math.max(-1.0, Math.min(1.0, attackerDirection.dot(toVictim)));
+                    aimAngle = Math.toDegrees(Math.acos(dotProduct));
+                }
+
                 if (attacker.getInventory().getItemInMainHand() != null) {
                     weaponUsed = attacker.getInventory().getItemInMainHand().getType().toString();
                 }
 
+                String logLevel = "INFO";
+                if (distance > 5.0) {
+                    logLevel = "CHEATERS";
+                } else if (distance > 4.0) {
+                    logLevel = "WARNING";
+                }
 
                 String logMessage = String.format(
-                        "%s damaged %s for %.2f damage using %s from a distance of %.2f blocks. Attacker location: %s, Victim location: %s",
+                        "%s damaged %s for %.2f damage using %s from a distance of %.2f blocks (aim angle: %.2f°). Attacker location: %s, Victim location: %s",
                         attacker.getName(),
                         victimName,
                         event.getFinalDamage(),
                         weaponUsed,
                         distance,
+                        aimAngle,
                         attacker.getLocation().toString(),
                         event.getEntity().getLocation().toString()
                 );
@@ -520,6 +537,7 @@ public class EventLogger implements Listener {
                 additionalFields.put("weaponUsed", weaponUsed);
                 additionalFields.put("attackerPing", attacker.getPing());
                 additionalFields.put("finalDamage", event.getFinalDamage());
+                additionalFields.put("aimAngleDegrees", aimAngle);
 
                 if (event.getEntity() instanceof Player) {
                     Player victimPlayer = (Player) event.getEntity();
@@ -528,7 +546,7 @@ public class EventLogger implements Listener {
 
                 api.log(
                         logMessage,
-                        "INFO",
+                        logLevel,
                         "EventLogger",
                         null,
                         attacker.getName(),
