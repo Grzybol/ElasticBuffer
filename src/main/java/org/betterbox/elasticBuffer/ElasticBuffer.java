@@ -32,6 +32,10 @@ import java.security.cert.X509Certificate;
 import java.util.logging.Handler;
 import java.util.logging.Logger;
 
+import org.betterbox.elasticBuffer.anticheat.AntiCheatManager;
+import org.betterbox.elasticBuffer.anticheat.CheckType;
+import org.betterbox.elasticBuffer.anticheat.SimpleAntiCheatCheck;
+
 public class ElasticBuffer extends JavaPlugin {
     private LogBuffer logBuffer;
     private final int interval = 1200; // 60 seconds * 20 TPS
@@ -42,6 +46,7 @@ public class ElasticBuffer extends JavaPlugin {
     private CustomLogHandler customLogHandler;
     private ServerEventLogger serverEventLogger;
     private CustomConsoleInjector consoleInjector;
+    private AntiCheatManager antiCheatManager;
 
     @Override
     public void onEnable() {
@@ -58,6 +63,8 @@ public class ElasticBuffer extends JavaPlugin {
         Set<ElasticBufferPluginLogger.LogLevel> defaultLogLevels = EnumSet.of(ElasticBufferPluginLogger.LogLevel.INFO, ElasticBufferPluginLogger.LogLevel.WARNING, ElasticBufferPluginLogger.LogLevel.ERROR);
         elasticBufferPluginLogger = new ElasticBufferPluginLogger(getDataFolder().getAbsolutePath(), defaultLogLevels,this);
         elasticBufferConfigManager = new ElasticBufferConfigManager(this, elasticBufferPluginLogger, getDataFolder().getAbsolutePath());
+        antiCheatManager = new AntiCheatManager(this, elasticBufferConfigManager, elasticBufferPluginLogger);
+        registerDefaultChecks();
         logBuffer = new LogBuffer();
         getServer().getScheduler().runTaskTimerAsynchronously(this, this::sendLogs, interval, interval);
         elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.INFO, "ElasticBufferAPI registered with ServicesManager");
@@ -108,6 +115,16 @@ public class ElasticBuffer extends JavaPlugin {
             return (ElasticBuffer) plugin;
         }
         return null; // Zwróć null, jeśli instancja nie jest dostępna
+    }
+
+    public AntiCheatManager getAntiCheatManager() {
+        return antiCheatManager;
+    }
+
+    private void registerDefaultChecks() {
+        antiCheatManager.registerCheck(new SimpleAntiCheatCheck("Reach", CheckType.REACH, 5.0));
+        antiCheatManager.registerCheck(new SimpleAntiCheatCheck("KillAura", CheckType.KILLAURA, 6.0));
+        antiCheatManager.registerCheck(new SimpleAntiCheatCheck("Velocity", CheckType.VELOCITY, 4.0));
     }
 
 
