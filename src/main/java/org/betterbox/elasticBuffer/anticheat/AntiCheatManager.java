@@ -1,5 +1,6 @@
 package org.betterbox.elasticBuffer.anticheat;
 
+import org.betterbox.elasticBuffer.ElasticBufferAPI;
 import org.betterbox.elasticBuffer.ElasticBufferConfigManager;
 import org.betterbox.elasticBuffer.ElasticBufferPluginLogger;
 import org.bukkit.Bukkit;
@@ -21,6 +22,7 @@ public class AntiCheatManager {
     private final PlayerViolationTracker violationTracker;
     private final ElasticBufferConfigManager configManager;
     private final ElasticBufferPluginLogger logger;
+    private final ElasticBufferAPI api;
     private final Plugin plugin;
     private final PlaceholderService placeholderService;
     private List<AntiCheatThresholdRule> rules = new ArrayList<>();
@@ -29,18 +31,21 @@ public class AntiCheatManager {
 
     public AntiCheatManager(Plugin plugin,
                             ElasticBufferConfigManager configManager,
-                            ElasticBufferPluginLogger logger) {
-        this(plugin, configManager, logger, new PlayerViolationTracker(), new PlaceholderService());
+                            ElasticBufferPluginLogger logger,
+                            ElasticBufferAPI api) {
+        this(plugin, configManager, logger, api, new PlayerViolationTracker(), new PlaceholderService());
     }
 
     public AntiCheatManager(Plugin plugin,
                             ElasticBufferConfigManager configManager,
                             ElasticBufferPluginLogger logger,
+                            ElasticBufferAPI api,
                             PlayerViolationTracker violationTracker,
                             PlaceholderService placeholderService) {
         this.plugin = plugin;
         this.configManager = configManager;
         this.logger = logger;
+        this.api = api;
         this.violationTracker = violationTracker;
         this.placeholderService = placeholderService;
         reload();
@@ -63,15 +68,15 @@ public class AntiCheatManager {
                 "Anti-cheat module " + (enabled ? "enabled" : "disabled") + " with " + rules.size() + " rule(s)");
     }
 
-    public void handleViolation(Player player, CheckType type, double severity) {
+    public void handleViolation(Player player, CheckType type, double severity, String reason, Map<String, Object> context) {
         if (!enabled) {
             return;
         }
         UUID playerId = player != null ? player.getUniqueId() : new UUID(0, 0);
         long now = System.currentTimeMillis();
-        violationTracker.addViolation(playerId, new ViolationRecord(type, severity, now), historyWindowMillis);
+        violationTracker.addViolation(playerId, new ViolationRecord(type, severity, now, reason, context), historyWindowMillis);
         logger.log(ElasticBufferPluginLogger.LogLevel.DEBUG,
-                "Recorded violation for " + (player != null ? player.getName() : "unknown") + " type=" + type + " severity=" + severity);
+                "Recorded violation for " + (player != null ? player.getName() : "unknown") + " type=" + type + " severity=" + severity + " reason=" + reason);
         evaluateRules(player, playerId, type, severity);
     }
 
@@ -89,6 +94,51 @@ public class AntiCheatManager {
         String resolved = placeholderService.applyPlaceholders(rule.getCommand(), player, type, severity, count);
         logger.log(ElasticBufferPluginLogger.LogLevel.INFO,
                 "Executing anti-cheat command for " + (player != null ? player.getName() : "unknown") + ": " + resolved);
+        logKickBundleIfNeeded(player, resolved);
         Bukkit.getScheduler().runTask(plugin, () -> Bukkit.getServer().dispatchCommand(Bukkit.getConsoleSender(), resolved));
+    }
+
+    private void logKickBundleIfNeeded(Player player, String resolvedCommand) {
+        if (player == null || api == null) {
+            return;
+        }
+
+        String normalized = resolvedCommand.toLowerCase();
+        boolean isKickCommand = normalized.startsWith("kick ") || normalized.contains(" kick ");
+        if (!isKickCommand) {
+            return;
+        }
+
+        String transactionId = UUID.randomUUID().toString();
+        List<ViolationRecord> recent = violationTracker.getRecentViolations(player.getUniqueId(), historyWindowMillis);
+
+        List<Map<String, Object>> violationSummaries = new ArrayList<>();
+        for (ViolationRecord record : recent) {
+            Map<String, Object> summary = new HashMap<>();
+            summary.put("type", record.getType().name());
+            summary.put("severity", record.getSeverity());
+            summary.put("timestamp", record.getTimestamp());
+            if (record.getReason() != null) {
+                summary.put("reason", record.getReason());
+            }
+            if (record.getDetails() != null && !record.getDetails().isEmpty()) {
+                summary.put("details", record.getDetails());
+            }
+            violationSummaries.add(summary);
+        }
+
+        Map<String, Object> additionalFields = new HashMap<>();
+        additionalFields.put("violations", violationSummaries);
+        additionalFields.put("command", resolvedCommand);
+
+        api.log(
+                "Player " + player.getName() + " kicked after anti-cheat violations",
+                "CHEATERS",
+                "AntiCheat",
+                transactionId,
+                player.getName(),
+                player.getUniqueId().toString(),
+                additionalFields
+        );
     }
 }
