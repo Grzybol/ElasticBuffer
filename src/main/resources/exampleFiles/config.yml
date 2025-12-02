@@ -13,6 +13,12 @@ apiKey: yourApiKey
 index_pattern: yourIndexPattern
 truststore_path: pathToCertFromYourElasticServer
 truststore_password: yourPassword
+serverName: BetterBox
+highMemoryUsageThreshold: 80.0
+lowTPSThreshold: 18.0
+highCpuUsageThreshold: 85.0
+highDiskUsageThreshold: 90.0
+monitoringIntervalTicks: 1200
 
 anti-cheat:
   enabled: true
