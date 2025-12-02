@@ -12,6 +12,10 @@ public class ViolationRecord {
     private final String reason;
     private final Map<String, Object> details;
 
+    public ViolationRecord(CheckType type, double severity, long timestamp) {
+        this(type, severity, timestamp, null, Map.of());
+    }
+
     public ViolationRecord(CheckType type, double severity, long timestamp, String reason, Map<String, Object> details) {
         this.type = type;
         this.severity = severity;
