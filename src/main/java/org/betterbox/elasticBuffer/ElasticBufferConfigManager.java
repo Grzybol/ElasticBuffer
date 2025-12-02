@@ -9,6 +9,8 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.*;
 
+import org.betterbox.elasticBuffer.anticheat.AntiCheatThresholdRule;
+
 public class ElasticBufferConfigManager {
     private JavaPlugin plugin;
     private final ElasticBufferPluginLogger elasticBufferPluginLogger;
@@ -20,6 +22,18 @@ public class ElasticBufferConfigManager {
     private String webhookURL,apiKey,indexPattern;
     private String truststorePath, truststorePassword,serverName="default-server";
     private boolean useSSL,local=true,authorization=false,checkCerts=false;
+    private boolean antiCheatEnabled = true;
+    private long violationHistorySeconds = 120;
+    private List<org.betterbox.elasticBuffer.anticheat.AntiCheatThresholdRule> antiCheatThresholdRules = new ArrayList<>();
+    private double reachWarningDistance = 4.0;
+    private double reachCriticalDistance = 5.0;
+    private double reachWarningSeverity = 6.0;
+    private double reachCriticalSeverity = 7.0;
+    private double killAuraLineOfSightSeverity = 6.0;
+    private double killAuraSameTickSeverity = 6.0;
+    private double killAuraSwitchSeverity = 6.5;
+    private int killAuraMaxHitsPerTick = 1;
+    private long killAuraSwitchIntervalMs = 50L;
     // New variables for monitoring thresholds
     private double highMemoryUsageThreshold;
     private double lowTPSThreshold;
@@ -231,6 +245,48 @@ public class ElasticBufferConfigManager {
             plugin.getConfig().set("truststore_path", "truststorePath");
             plugin.saveConfig();
         }
+
+        antiCheatEnabled = plugin.getConfig().getBoolean("anti-cheat.enabled", true);
+        violationHistorySeconds = plugin.getConfig().getLong("anti-cheat.violation-history-seconds", 120L);
+        if (!plugin.getConfig().contains("anti-cheat")) {
+            elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.WARNING, "ConfigManager: anti-cheat section not fou" +
+                    "nd in config! Creating defaults.");
+            plugin.getConfig().createSection("anti-cheat");
+            plugin.getConfig().set("anti-cheat.enabled", antiCheatEnabled);
+            plugin.getConfig().set("anti-cheat.violation-history-seconds", violationHistorySeconds);
+            plugin.saveConfig();
+        }
+
+        antiCheatThresholdRules = new ArrayList<>();
+        List<Map<?, ?>> rules = plugin.getConfig().getMapList("anti-cheat.thresholds");
+        if (rules.isEmpty()) {
+            Map<String, Object> defaultRule = new HashMap<>();
+            defaultRule.put("severityMin", 5);
+            defaultRule.put("countMin", 3);
+            defaultRule.put("windowSeconds", 60);
+            defaultRule.put("command", "kick %player_name% Suspicious combat behaviour (%check_type%)");
+            plugin.getConfig().set("anti-cheat.thresholds", Collections.singletonList(defaultRule));
+            plugin.saveConfig();
+            rules = plugin.getConfig().getMapList("anti-cheat.thresholds");
+        }
+
+        for (Map<?, ?> rule : rules) {
+            double severityMin = readDouble(rule.get("severityMin"), 0);
+            int countMin = readInt(rule.get("countMin"), 1);
+            long windowSeconds = readLong(rule.get("windowSeconds"), violationHistorySeconds);
+            String command = Objects.toString(rule.get("command"), "");
+            antiCheatThresholdRules.add(new AntiCheatThresholdRule(severityMin, countMin, windowSeconds * 1000L, command));
+        }
+
+        reachWarningDistance = plugin.getConfig().getDouble("anti-cheat.checks.reach.warning-distance", 4.0);
+        reachCriticalDistance = plugin.getConfig().getDouble("anti-cheat.checks.reach.critical-distance", 5.0);
+        reachWarningSeverity = plugin.getConfig().getDouble("anti-cheat.checks.reach.warning-severity", 6.0);
+        reachCriticalSeverity = plugin.getConfig().getDouble("anti-cheat.checks.reach.critical-severity", 7.0);
+        killAuraLineOfSightSeverity = plugin.getConfig().getDouble("anti-cheat.checks.kill-aura.line-of-sight-severity", 6.0);
+        killAuraSameTickSeverity = plugin.getConfig().getDouble("anti-cheat.checks.kill-aura.same-tick-hit-severity", 6.0);
+        killAuraSwitchSeverity = plugin.getConfig().getDouble("anti-cheat.checks.kill-aura.switch-violation-severity", 6.5);
+        killAuraMaxHitsPerTick = plugin.getConfig().getInt("anti-cheat.checks.kill-aura.max-hits-per-tick", 1);
+        killAuraSwitchIntervalMs = plugin.getConfig().getLong("anti-cheat.checks.kill-aura.switch-interval-ms", 50L);
 
         truststorePassword = plugin.getConfig().getString("truststore_password");
         if (plugin.getConfig().contains("truststore_password")){
@@ -467,6 +523,93 @@ public class ElasticBufferConfigManager {
 
     public long getMonitoringIntervalTicks() {
         return monitoringIntervalTicks;
+    }
+
+    public boolean isAntiCheatEnabled() {
+        return antiCheatEnabled;
+    }
+
+    public long getViolationHistorySeconds() {
+        return violationHistorySeconds;
+    }
+
+    public List<AntiCheatThresholdRule> getAntiCheatThresholdRules() {
+        return Collections.unmodifiableList(antiCheatThresholdRules);
+    }
+
+    public double getReachWarningDistance() {
+        return reachWarningDistance;
+    }
+
+    public double getReachCriticalDistance() {
+        return reachCriticalDistance;
+    }
+
+    public double getReachWarningSeverity() {
+        return reachWarningSeverity;
+    }
+
+    public double getReachCriticalSeverity() {
+        return reachCriticalSeverity;
+    }
+
+    public double getKillAuraLineOfSightSeverity() {
+        return killAuraLineOfSightSeverity;
+    }
+
+    public double getKillAuraSameTickSeverity() {
+        return killAuraSameTickSeverity;
+    }
+
+    public double getKillAuraSwitchSeverity() {
+        return killAuraSwitchSeverity;
+    }
+
+    public int getKillAuraMaxHitsPerTick() {
+        return killAuraMaxHitsPerTick;
+    }
+
+    public long getKillAuraSwitchIntervalMs() {
+        return killAuraSwitchIntervalMs;
+    }
+
+    private double readDouble(Object value, double defaultValue) {
+        if (value instanceof Number) {
+            return ((Number) value).doubleValue();
+        }
+        try {
+            return value != null ? Double.parseDouble(value.toString()) : defaultValue;
+        } catch (NumberFormatException ex) {
+            elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.WARNING,
+                    "ConfigManager: invalid double value in anti-cheat rule, using default " + defaultValue);
+            return defaultValue;
+        }
+    }
+
+    private int readInt(Object value, int defaultValue) {
+        if (value instanceof Number) {
+            return ((Number) value).intValue();
+        }
+        try {
+            return value != null ? Integer.parseInt(value.toString()) : defaultValue;
+        } catch (NumberFormatException ex) {
+            elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.WARNING,
+                    "ConfigManager: invalid integer value in anti-cheat rule, using default " + defaultValue);
+            return defaultValue;
+        }
+    }
+
+    private long readLong(Object value, long defaultValue) {
+        if (value instanceof Number) {
+            return ((Number) value).longValue();
+        }
+        try {
+            return value != null ? Long.parseLong(value.toString()) : defaultValue;
+        } catch (NumberFormatException ex) {
+            elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.WARNING,
+                    "ConfigManager: invalid long value in anti-cheat rule, using default " + defaultValue);
+            return defaultValue;
+        }
     }
 
 }

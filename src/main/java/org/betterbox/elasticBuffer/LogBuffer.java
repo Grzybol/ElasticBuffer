@@ -2,6 +2,7 @@ package org.betterbox.elasticBuffer;
 
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 
 public class LogBuffer {
     private final List<LogEntry> buffer;  // Lista do przechowywania logów jako obiekty LogEntry
@@ -15,8 +16,8 @@ public class LogBuffer {
      * @param log Treść logu do dodania.
      * @param level Poziom logowania.
      */
-    public synchronized void add(String log, String level, String pluginName, long timestamp,String transactionID,String playerName,String uuid, double keyValue) {
-        buffer.add(new LogEntry(log, level, pluginName, timestamp,transactionID,playerName,uuid,keyValue));
+    public synchronized void add(String log, String level, String pluginName, long timestamp,String transactionID,String playerName,String uuid, double keyValue, Map<String, Object> additionalFields) {
+        buffer.add(new LogEntry(log, level, pluginName, timestamp,transactionID,playerName,uuid,keyValue, additionalFields));
     }
 
     /**

@@ -31,19 +31,35 @@ import org.bukkit.event.player.PlayerRegisterChannelEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.metadata.FixedMetadataValue;
 import org.bukkit.plugin.Plugin;
+import org.bukkit.util.Vector;
+
+import org.betterbox.elasticBuffer.anticheat.AntiCheatManager;
+import org.betterbox.elasticBuffer.anticheat.CheckType;
 
 import javax.management.monitor.Monitor;
 import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+
+import org.betterbox.elasticBuffer.ElasticBufferConfigManager;
 
 public class EventLogger implements Listener {
     private final ElasticBufferAPI api;
     private final Plugin plugin;
+    private final ElasticBufferConfigManager configManager;
+    private final AntiCheatManager antiCheatManager;
+    private final Map<UUID, Long> lastAttackTicks = new HashMap<>();
+    private final Map<UUID, Integer> attacksPerTick = new HashMap<>();
+    private final Map<UUID, UUID> lastAttackTarget = new HashMap<>();
+    private final Map<UUID, Long> lastAttackTime = new HashMap<>();
 
-    public EventLogger(ElasticBufferAPI api, Plugin plugin) {
+    public EventLogger(ElasticBufferAPI api, Plugin plugin, ElasticBufferConfigManager configManager, AntiCheatManager antiCheatManager) {
         this.api = api;
         this.plugin = plugin;
+        this.configManager = configManager;
+        this.antiCheatManager = antiCheatManager;
     }
 
     // Helper method to set metadata and schedule its removal
@@ -431,11 +447,11 @@ public class EventLogger implements Listener {
             }
             setTemporaryMetadata(player, "eventPlayerCraftHandled", 1L);
 
-            Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
-                api.log(player.getName() + " crafted: " + event.getCurrentItem().getType(), "INFO", "EventLogger",
-                        null, player.getName(), player.getUniqueId().toString());
-            });
-        }
+        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+            api.log(player.getName() + " crafted: " + event.getCurrentItem().getType(), "INFO", "EventLogger",
+                    null, player.getName(), player.getUniqueId().toString());
+        });
+    }
     }
 
     @EventHandler
@@ -479,51 +495,184 @@ public class EventLogger implements Listener {
             return;
         }
 
-        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
-            if (damager instanceof Player) {
-                Player attacker = (Player) damager;
-                String victimName;
-                String victimUUID = null;
-                double distance = 0.0;
-                String weaponUsed = "Unknown";
+        if (damager instanceof Player) {
+            Player attacker = (Player) damager;
+            String victimName;
+            String victimUUID = null;
+            double distance = 0.0;
+            String weaponUsed = "Unknown";
+            double aimAngle = 0.0;
 
-                if (event.getEntity() instanceof Player) {
-                    Player victim = (Player) event.getEntity();
-                    victimName = victim.getName();
-                    victimUUID = victim.getUniqueId().toString();
-                    distance = attacker.getLocation().distance(victim.getLocation());
-                } else {
-                    victimName = event.getEntity().getType().toString();
-                    distance = attacker.getLocation().distance(event.getEntity().getLocation());
+            if (event.getEntity() instanceof Player) {
+                Player victim = (Player) event.getEntity();
+                victimName = victim.getName();
+                victimUUID = victim.getUniqueId().toString();
+                distance = attacker.getLocation().distance(victim.getLocation());
+            } else {
+                victimName = event.getEntity().getType().toString();
+                distance = attacker.getLocation().distance(event.getEntity().getLocation());
+            }
+
+            Vector attackerDirection = attacker.getLocation().getDirection().normalize();
+            Vector toVictimVector = event.getEntity().getLocation().toVector().subtract(attacker.getLocation().toVector());
+            if (toVictimVector.lengthSquared() > 0) {
+                Vector toVictim = toVictimVector.normalize();
+                double dotProduct = Math.max(-1.0, Math.min(1.0, attackerDirection.dot(toVictim)));
+                aimAngle = Math.toDegrees(Math.acos(dotProduct));
+            }
+
+            if (attacker.getInventory().getItemInMainHand() != null) {
+                weaponUsed = attacker.getInventory().getItemInMainHand().getType().toString();
+            }
+
+            Map<String, Object> combatContext = buildCombatContext(attacker, victimEntity, event, distance, aimAngle, weaponUsed, victimUUID);
+
+            processCombatChecks(event, attacker, victimEntity, distance, aimAngle, combatContext);
+
+            String finalVictimName = victimName;
+            String finalVictimUUID = victimUUID;
+            String finalWeaponUsed = weaponUsed;
+            double finalDistance = distance;
+            double finalAimAngle = aimAngle;
+
+            Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+                String logLevel = "INFO";
+                if (finalDistance > 5.0) {
+                    logLevel = "CHEATERS";
+                } else if (finalDistance > 4.0) {
+                    logLevel = "WARNING";
                 }
-
-                if (attacker.getInventory().getItemInMainHand() != null) {
-                    weaponUsed = attacker.getInventory().getItemInMainHand().getType().toString();
-                }
-
 
                 String logMessage = String.format(
-                        "%s damaged %s for %.2f damage using %s from a distance of %.2f blocks. Attacker location: %s, Victim location: %s",
+                        "%s damaged %s for %.2f damage using %s from a distance of %.2f blocks (aim angle: %.2f°). Attacker location: %s, Victim location: %s",
                         attacker.getName(),
-                        victimName,
+                        finalVictimName,
                         event.getFinalDamage(),
-                        weaponUsed,
-                        distance,
+                        finalWeaponUsed,
+                        finalDistance,
+                        finalAimAngle,
                         attacker.getLocation().toString(),
                         event.getEntity().getLocation().toString()
                 );
 
+                Map<String, Object> additionalFields = new HashMap<>(combatContext);
+
                 api.log(
                         logMessage,
-                        "INFO",
+                        logLevel,
                         "EventLogger",
                         null,
                         attacker.getName(),
                         attacker.getUniqueId().toString(),
-                        distance
+                        additionalFields
                 );
-            }
-        });
+            });
+        }
+    }
+
+    private void processCombatChecks(EntityDamageByEntityEvent event, Player attacker, LivingEntity victim, double distance, double aimAngle, Map<String, Object> combatContext) {
+        handleReachCheck(attacker, victim, distance, combatContext);
+        handleKillAuraChecks(event, attacker, victim, distance, aimAngle, combatContext);
+    }
+
+    private Map<String, Object> buildCombatContext(Player attacker, LivingEntity victim, EntityDamageByEntityEvent event, double distance, double aimAngle, String weaponUsed, String victimUUID) {
+        Map<String, Object> fields = new HashMap<>();
+        fields.put("distance", distance);
+        fields.put("weaponUsed", weaponUsed);
+        fields.put("attackerPing", attacker.getPing());
+        fields.put("finalDamage", event.getFinalDamage());
+        fields.put("aimAngleDegrees", aimAngle);
+        fields.put("attackerLocation", attacker.getLocation().toString());
+        fields.put("attackerYaw", attacker.getLocation().getYaw());
+        fields.put("attackerPitch", attacker.getLocation().getPitch());
+        fields.put("victimLocation", victim.getLocation().toString());
+        fields.put("victimType", victim.getType().toString());
+
+        if (victim instanceof Player) {
+            Player victimPlayer = (Player) victim;
+            fields.put("victimPing", victimPlayer.getPing());
+            fields.put("victimUUID", victimUUID);
+            fields.put("victimYaw", victimPlayer.getLocation().getYaw());
+            fields.put("victimPitch", victimPlayer.getLocation().getPitch());
+        }
+
+        return fields;
+    }
+
+    private void handleReachCheck(Player attacker, LivingEntity victim, double distance, Map<String, Object> combatContext) {
+        double severity = 0.0;
+        String reason = null;
+
+        if (distance > configManager.getReachCriticalDistance()) {
+            severity = configManager.getReachCriticalSeverity();
+            reason = String.format("Reach violation: %.2f blocks (critical threshold %.2f)", distance, configManager.getReachCriticalDistance());
+        } else if (distance > configManager.getReachWarningDistance()) {
+            severity = configManager.getReachWarningSeverity();
+            reason = String.format("Reach warning: %.2f blocks (warning threshold %.2f)", distance, configManager.getReachWarningDistance());
+        }
+
+        if (severity > 0.0) {
+            Map<String, Object> fields = new HashMap<>(combatContext);
+            logAndHandleViolation(attacker, CheckType.REACH, severity, reason, fields);
+        }
+    }
+
+    private void handleKillAuraChecks(EntityDamageByEntityEvent event, Player attacker, LivingEntity victim, double distance, double aimAngle, Map<String, Object> combatContext) {
+        if (!attacker.hasLineOfSight(victim)) {
+            Map<String, Object> fields = new HashMap<>(combatContext);
+            fields.put("lineOfSight", false);
+            logAndHandleViolation(attacker, CheckType.KILLAURA, configManager.getKillAuraLineOfSightSeverity(),
+                    "KillAura suspicion: target not in line of sight", fields);
+        }
+
+        UUID attackerId = attacker.getUniqueId();
+        UUID victimId = victim.getUniqueId();
+        long currentTick = attacker.getWorld().getFullTime();
+        long lastTick = lastAttackTicks.getOrDefault(attackerId, -1L);
+        int hitsThisTick = currentTick == lastTick ? attacksPerTick.getOrDefault(attackerId, 0) + 1 : 1;
+
+        if (hitsThisTick > configManager.getKillAuraMaxHitsPerTick()) {
+            Map<String, Object> fields = new HashMap<>(combatContext);
+            fields.put("hitsThisTick", hitsThisTick);
+            fields.put("tick", currentTick);
+            logAndHandleViolation(attacker, CheckType.KILLAURA, configManager.getKillAuraSameTickSeverity(),
+                    "KillAura suspicion: multiple hits within a single tick", fields);
+        }
+
+        UUID lastVictim = lastAttackTarget.get(attackerId);
+        long now = System.currentTimeMillis();
+        long lastTime = lastAttackTime.getOrDefault(attackerId, 0L);
+        if (lastVictim != null && !lastVictim.equals(victimId) && (now - lastTime) < configManager.getKillAuraSwitchIntervalMs()) {
+            Map<String, Object> fields = new HashMap<>(combatContext);
+            fields.put("switchIntervalMs", now - lastTime);
+            fields.put("previousTarget", lastVictim.toString());
+            fields.put("currentTarget", victimId.toString());
+            logAndHandleViolation(attacker, CheckType.KILLAURA, configManager.getKillAuraSwitchSeverity(),
+                    "KillAura suspicion: rapid target switching", fields);
+        }
+
+        lastAttackTicks.put(attackerId, currentTick);
+        attacksPerTick.put(attackerId, hitsThisTick);
+        lastAttackTarget.put(attackerId, victimId);
+        lastAttackTime.put(attackerId, now);
+    }
+
+    private void logAndHandleViolation(Player attacker, CheckType type, double severity, String reason, Map<String, Object> additionalFields) {
+        Map<String, Object> fields = new HashMap<>(additionalFields);
+        fields.put("severity", severity);
+        fields.put("checkType", type.name());
+
+        if (antiCheatManager != null) {
+            antiCheatManager.handleViolation(attacker, type, severity, reason, fields);
+        }
+
+        String logLevel = severity >= 7.0 ? "CHEATERS" : "WARNING";
+        String playerName = attacker != null ? attacker.getName() : "N/A";
+        String playerUUID = attacker != null ? attacker.getUniqueId().toString() : "N/A";
+
+        Bukkit.getScheduler().runTaskAsynchronously(plugin, () ->
+                api.log(reason, logLevel, "AntiCheat", null, playerName, playerUUID, fields)
+        );
     }
 
     @EventHandler
@@ -588,10 +737,19 @@ public class EventLogger implements Listener {
         double difference = newBalance - oldBalance;
 
         // Logowanie zmiany balansu
+        Map<String, Object> balanceChangeFields = new HashMap<>();
+        balanceChangeFields.put("difference", difference);
+        balanceChangeFields.put("oldBalance", oldBalance);
+        balanceChangeFields.put("newBalance", newBalance);
+
         api.log("balance changed by " + difference,
-                "INFO", "Economy", null, playerName, event.getPlayer().getUniqueId().toString(), difference);
+                "INFO", "Economy", null, playerName, event.getPlayer().getUniqueId().toString(), balanceChangeFields);
+
+        Map<String, Object> balanceStateFields = new HashMap<>();
+        balanceStateFields.put("balance", newBalance);
+
         api.log("Player " + playerName + " balance: " + newBalance,
-                "INFO", "Economy", null, playerName, event.getPlayer().getUniqueId().toString(), newBalance);
+                "INFO", "Economy", null, playerName, event.getPlayer().getUniqueId().toString(), balanceStateFields);
     }
 
 }

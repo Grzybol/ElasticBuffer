@@ -20,14 +20,21 @@ import java.security.KeyManagementException;
 import java.security.KeyStore;
 import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.EnumSet;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import javax.net.ssl.*;
 import java.security.SecureRandom;
 import java.security.cert.X509Certificate;
 import java.util.logging.Handler;
 import java.util.logging.Logger;
+
+import org.betterbox.elasticBuffer.anticheat.AntiCheatManager;
+import org.betterbox.elasticBuffer.anticheat.CheckType;
+import org.betterbox.elasticBuffer.anticheat.SimpleAntiCheatCheck;
 
 public class ElasticBuffer extends JavaPlugin {
     private LogBuffer logBuffer;
@@ -39,6 +46,7 @@ public class ElasticBuffer extends JavaPlugin {
     private CustomLogHandler customLogHandler;
     private ServerEventLogger serverEventLogger;
     private CustomConsoleInjector consoleInjector;
+    private AntiCheatManager antiCheatManager;
 
     @Override
     public void onEnable() {
@@ -55,6 +63,8 @@ public class ElasticBuffer extends JavaPlugin {
         Set<ElasticBufferPluginLogger.LogLevel> defaultLogLevels = EnumSet.of(ElasticBufferPluginLogger.LogLevel.INFO, ElasticBufferPluginLogger.LogLevel.WARNING, ElasticBufferPluginLogger.LogLevel.ERROR);
         elasticBufferPluginLogger = new ElasticBufferPluginLogger(getDataFolder().getAbsolutePath(), defaultLogLevels,this);
         elasticBufferConfigManager = new ElasticBufferConfigManager(this, elasticBufferPluginLogger, getDataFolder().getAbsolutePath());
+        antiCheatManager = new AntiCheatManager(this, elasticBufferConfigManager, elasticBufferPluginLogger, api);
+        registerDefaultChecks();
         logBuffer = new LogBuffer();
         getServer().getScheduler().runTaskTimerAsynchronously(this, this::sendLogs, interval, interval);
         elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.INFO, "ElasticBufferAPI registered with ServicesManager");
@@ -76,7 +86,7 @@ public class ElasticBuffer extends JavaPlugin {
         Logger logger = Bukkit.getLogger();
         customLogHandler = new CustomLogHandler(this);
         logger.addHandler(customLogHandler);
-        getServer().getPluginManager().registerEvents(new EventLogger(api,this), this);
+        getServer().getPluginManager().registerEvents(new EventLogger(api,this, elasticBufferConfigManager, antiCheatManager), this);
         // Rejestracja listenera zdarzeń serwerowych
         serverEventLogger = new ServerEventLogger(api, this,elasticBufferConfigManager);
         getServer().getPluginManager().registerEvents(new ServerEventLogger(api, this,elasticBufferConfigManager), this);
@@ -107,22 +117,44 @@ public class ElasticBuffer extends JavaPlugin {
         return null; // Zwróć null, jeśli instancja nie jest dostępna
     }
 
+    public AntiCheatManager getAntiCheatManager() {
+        return antiCheatManager;
+    }
+
+    private void registerDefaultChecks() {
+        antiCheatManager.registerCheck(new SimpleAntiCheatCheck("Reach", CheckType.REACH, 5.0));
+        antiCheatManager.registerCheck(new SimpleAntiCheatCheck("KillAura", CheckType.KILLAURA, 6.0));
+        antiCheatManager.registerCheck(new SimpleAntiCheatCheck("Velocity", CheckType.VELOCITY, 4.0));
+    }
+
 
 
 
     public synchronized void receiveLog(String log, String level, String pluginName,String transactionID,String playerName, String uuid) {
-        long logTimestamp = System.currentTimeMillis();
-        logBuffer.add(log, level, pluginName,logTimestamp,transactionID,playerName,uuid,0);
-        elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.DEBUG, "Received log: " + log+", pluginName: "+pluginName+". level: "+level);
+        receiveLog(log, level, pluginName, transactionID, playerName, uuid, 0.0, Collections.emptyMap());
     }
     public synchronized void receiveLog(String log, String level, String pluginName,String transactionID) {
-        long logTimestamp = System.currentTimeMillis();
-        logBuffer.add(log, level, pluginName,logTimestamp,transactionID,null,null,0);
-        elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.DEBUG, "Received log: " + log+", pluginName: "+pluginName+". level: "+level);
+        receiveLog(log, level, pluginName, transactionID, null, null, 0.0, Collections.emptyMap());
     }
     public synchronized void receiveLog(String log, String level, String pluginName,String transactionID,String playerName, String uuid, double keyValue) {
+        Map<String, Object> fields = new HashMap<>();
+        fields.put("keyValue", keyValue);
+        receiveLog(log, level, pluginName, transactionID, playerName, uuid, keyValue, fields);
+    }
+    public synchronized void receiveLog(String log, String level, String pluginName,String transactionID,String playerName, String uuid, Map<String, Object> additionalFields) {
+        receiveLog(log, level, pluginName, transactionID, playerName, uuid, 0.0, additionalFields);
+    }
+
+    public synchronized void receiveLog(String log, String level, String pluginName,String transactionID,String playerName, String uuid, double keyValue, Map<String, Object> additionalFields) {
         long logTimestamp = System.currentTimeMillis();
-        logBuffer.add(log, level, pluginName,logTimestamp,transactionID,playerName,uuid,keyValue);
+        Map<String, Object> safeFields = additionalFields != null ? new HashMap<>(additionalFields) : new HashMap<>();
+        Object keyValueFromFields = safeFields.remove("keyValue");
+        double resolvedKeyValue = keyValue;
+        if (keyValueFromFields instanceof Number) {
+            resolvedKeyValue = ((Number) keyValueFromFields).doubleValue();
+        }
+
+        logBuffer.add(log, level, pluginName,logTimestamp,transactionID,playerName,uuid,resolvedKeyValue, safeFields);
         elasticBufferPluginLogger.log(ElasticBufferPluginLogger.LogLevel.DEBUG, "Received log: " + log+", pluginName: "+pluginName+". level: "+level);
     }
 
@@ -266,11 +298,13 @@ public class ElasticBuffer extends JavaPlugin {
     }
 
     private String buildNdjsonChunk(LogEntry logEntry, String messageChunk) {
-        String sanitizedMessage = sanitizeMessage(messageChunk);
+        String sanitizedMessage = sanitizeValue(messageChunk);
         StringBuilder ndjsonBuilder = new StringBuilder();
         ndjsonBuilder.append("{\"index\":{}}\n");
+
+        ndjsonBuilder.append("{");
         ndjsonBuilder.append(String.format(
-                "{\"timestamp\":\"%s\",\"plugin\":\"%s\",\"transactionID\":\"%s\",\"level\":\"%s\",\"message\":\"%s\",\"playerName\":\"%s\",\"uuid\":\"%s\",\"serverName\":\"%s\",\"keyValue\":\"%.5f\"}\n",
+                "\"timestamp\":\"%s\",\"plugin\":\"%s\",\"transactionID\":\"%s\",\"level\":\"%s\",\"message\":\"%s\",\"playerName\":\"%s\",\"uuid\":\"%s\",\"serverName\":\"%s\",\"keyValue\":\"%.5f\"",
                 java.time.format.DateTimeFormatter.ISO_INSTANT.format(java.time.Instant.ofEpochMilli(logEntry.getTimestamp())),
                 logEntry.getPluginName(),
                 logEntry.getTransactionID(),
@@ -281,10 +315,27 @@ public class ElasticBuffer extends JavaPlugin {
                 elasticBufferConfigManager.getServerName(),
                 logEntry.getKeyValue()
         ));
+
+        for (Map.Entry<String, Object> entry : logEntry.getAdditionalFields().entrySet()) {
+            if (entry.getKey() == null || entry.getValue() == null) {
+                continue;
+            }
+            ndjsonBuilder.append(",\"").append(sanitizeValue(entry.getKey())).append("\":");
+            ndjsonBuilder.append(formatAdditionalValue(entry.getValue()));
+        }
+
+        ndjsonBuilder.append("}\n");
         return ndjsonBuilder.toString();
     }
-    private String sanitizeMessage(String message) {
-        // Usuwanie znaku przejścia do nowej linii i cudzysłowu
+    private String sanitizeValue(String message) {
+        // Usuwanie cudzysłowów, aby nie zepsuć formatu JSON
         return message.replace("\"", "");
+    }
+
+    private String formatAdditionalValue(Object value) {
+        if (value instanceof Number || value instanceof Boolean) {
+            return value.toString();
+        }
+        return "\"" + sanitizeValue(String.valueOf(value)) + "\"";
     }
 }
