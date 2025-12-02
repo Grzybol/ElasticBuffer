@@ -525,7 +525,9 @@ public class EventLogger implements Listener {
                 weaponUsed = attacker.getInventory().getItemInMainHand().getType().toString();
             }
 
-            processCombatChecks(event, attacker, victimEntity, distance, aimAngle);
+            Map<String, Object> combatContext = buildCombatContext(attacker, victimEntity, event, distance, aimAngle, weaponUsed, victimUUID);
+
+            processCombatChecks(event, attacker, victimEntity, distance, aimAngle, combatContext);
 
             String finalVictimName = victimName;
             String finalVictimUUID = victimUUID;
@@ -553,18 +555,7 @@ public class EventLogger implements Listener {
                         event.getEntity().getLocation().toString()
                 );
 
-                Map<String, Object> additionalFields = new HashMap<>();
-                additionalFields.put("distance", finalDistance);
-                additionalFields.put("weaponUsed", finalWeaponUsed);
-                additionalFields.put("attackerPing", attacker.getPing());
-                additionalFields.put("finalDamage", event.getFinalDamage());
-                additionalFields.put("aimAngleDegrees", finalAimAngle);
-
-                if (event.getEntity() instanceof Player) {
-                    Player victimPlayer = (Player) event.getEntity();
-                    additionalFields.put("victimPing", victimPlayer.getPing());
-                    additionalFields.put("victimUUID", finalVictimUUID);
-                }
+                Map<String, Object> additionalFields = new HashMap<>(combatContext);
 
                 api.log(
                         logMessage,
@@ -579,12 +570,36 @@ public class EventLogger implements Listener {
         }
     }
 
-    private void processCombatChecks(EntityDamageByEntityEvent event, Player attacker, LivingEntity victim, double distance, double aimAngle) {
-        handleReachCheck(attacker, victim, distance);
-        handleKillAuraChecks(event, attacker, victim, distance, aimAngle);
+    private void processCombatChecks(EntityDamageByEntityEvent event, Player attacker, LivingEntity victim, double distance, double aimAngle, Map<String, Object> combatContext) {
+        handleReachCheck(attacker, victim, distance, combatContext);
+        handleKillAuraChecks(event, attacker, victim, distance, aimAngle, combatContext);
     }
 
-    private void handleReachCheck(Player attacker, LivingEntity victim, double distance) {
+    private Map<String, Object> buildCombatContext(Player attacker, LivingEntity victim, EntityDamageByEntityEvent event, double distance, double aimAngle, String weaponUsed, String victimUUID) {
+        Map<String, Object> fields = new HashMap<>();
+        fields.put("distance", distance);
+        fields.put("weaponUsed", weaponUsed);
+        fields.put("attackerPing", attacker.getPing());
+        fields.put("finalDamage", event.getFinalDamage());
+        fields.put("aimAngleDegrees", aimAngle);
+        fields.put("attackerLocation", attacker.getLocation().toString());
+        fields.put("attackerYaw", attacker.getLocation().getYaw());
+        fields.put("attackerPitch", attacker.getLocation().getPitch());
+        fields.put("victimLocation", victim.getLocation().toString());
+        fields.put("victimType", victim.getType().toString());
+
+        if (victim instanceof Player) {
+            Player victimPlayer = (Player) victim;
+            fields.put("victimPing", victimPlayer.getPing());
+            fields.put("victimUUID", victimUUID);
+            fields.put("victimYaw", victimPlayer.getLocation().getYaw());
+            fields.put("victimPitch", victimPlayer.getLocation().getPitch());
+        }
+
+        return fields;
+    }
+
+    private void handleReachCheck(Player attacker, LivingEntity victim, double distance, Map<String, Object> combatContext) {
         double severity = 0.0;
         String reason = null;
 
@@ -597,18 +612,14 @@ public class EventLogger implements Listener {
         }
 
         if (severity > 0.0) {
-            Map<String, Object> fields = new HashMap<>();
-            fields.put("distance", distance);
-            fields.put("victimType", victim.getType().toString());
+            Map<String, Object> fields = new HashMap<>(combatContext);
             logAndHandleViolation(attacker, CheckType.REACH, severity, reason, fields);
         }
     }
 
-    private void handleKillAuraChecks(EntityDamageByEntityEvent event, Player attacker, LivingEntity victim, double distance, double aimAngle) {
+    private void handleKillAuraChecks(EntityDamageByEntityEvent event, Player attacker, LivingEntity victim, double distance, double aimAngle, Map<String, Object> combatContext) {
         if (!attacker.hasLineOfSight(victim)) {
-            Map<String, Object> fields = new HashMap<>();
-            fields.put("distance", distance);
-            fields.put("aimAngleDegrees", aimAngle);
+            Map<String, Object> fields = new HashMap<>(combatContext);
             fields.put("lineOfSight", false);
             logAndHandleViolation(attacker, CheckType.KILLAURA, configManager.getKillAuraLineOfSightSeverity(),
                     "KillAura suspicion: target not in line of sight", fields);
@@ -621,7 +632,7 @@ public class EventLogger implements Listener {
         int hitsThisTick = currentTick == lastTick ? attacksPerTick.getOrDefault(attackerId, 0) + 1 : 1;
 
         if (hitsThisTick > configManager.getKillAuraMaxHitsPerTick()) {
-            Map<String, Object> fields = new HashMap<>();
+            Map<String, Object> fields = new HashMap<>(combatContext);
             fields.put("hitsThisTick", hitsThisTick);
             fields.put("tick", currentTick);
             logAndHandleViolation(attacker, CheckType.KILLAURA, configManager.getKillAuraSameTickSeverity(),
@@ -632,7 +643,7 @@ public class EventLogger implements Listener {
         long now = System.currentTimeMillis();
         long lastTime = lastAttackTime.getOrDefault(attackerId, 0L);
         if (lastVictim != null && !lastVictim.equals(victimId) && (now - lastTime) < configManager.getKillAuraSwitchIntervalMs()) {
-            Map<String, Object> fields = new HashMap<>();
+            Map<String, Object> fields = new HashMap<>(combatContext);
             fields.put("switchIntervalMs", now - lastTime);
             fields.put("previousTarget", lastVictim.toString());
             fields.put("currentTarget", victimId.toString());
@@ -647,13 +658,13 @@ public class EventLogger implements Listener {
     }
 
     private void logAndHandleViolation(Player attacker, CheckType type, double severity, String reason, Map<String, Object> additionalFields) {
-        if (antiCheatManager != null) {
-            antiCheatManager.handleViolation(attacker, type, severity);
-        }
-
         Map<String, Object> fields = new HashMap<>(additionalFields);
         fields.put("severity", severity);
         fields.put("checkType", type.name());
+
+        if (antiCheatManager != null) {
+            antiCheatManager.handleViolation(attacker, type, severity, reason, fields);
+        }
 
         String logLevel = severity >= 7.0 ? "CHEATERS" : "WARNING";
         String playerName = attacker != null ? attacker.getName() : "N/A";

@@ -63,7 +63,7 @@ public class ElasticBuffer extends JavaPlugin {
         Set<ElasticBufferPluginLogger.LogLevel> defaultLogLevels = EnumSet.of(ElasticBufferPluginLogger.LogLevel.INFO, ElasticBufferPluginLogger.LogLevel.WARNING, ElasticBufferPluginLogger.LogLevel.ERROR);
         elasticBufferPluginLogger = new ElasticBufferPluginLogger(getDataFolder().getAbsolutePath(), defaultLogLevels,this);
         elasticBufferConfigManager = new ElasticBufferConfigManager(this, elasticBufferPluginLogger, getDataFolder().getAbsolutePath());
-        antiCheatManager = new AntiCheatManager(this, elasticBufferConfigManager, elasticBufferPluginLogger);
+        antiCheatManager = new AntiCheatManager(this, elasticBufferConfigManager, elasticBufferPluginLogger, api);
         registerDefaultChecks();
         logBuffer = new LogBuffer();
         getServer().getScheduler().runTaskTimerAsynchronously(this, this::sendLogs, interval, interval);
