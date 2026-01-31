@@ -64,6 +64,76 @@ api.log("Custom event", "INFO", "MyPlugin", "txn-456", player.getName(), player.
 
 Internally, the API delegates to `ElasticBuffer.receiveLog`, which stamps timestamps, merges additional fields, and enqueues a `LogEntry`. Logs are flushed in batches on the configured interval.
 
+## API Communication (HTTP/Elasticsearch Bulk)
+ElasticBuffer ships logs over HTTP using the Elasticsearch Bulk API format (NDJSON). Each log entry is converted into a two-line NDJSON payload and sent via `POST` to the configured ingest endpoint. The endpoint is constructed as:
+
+- **Local mode**: `http://localhost:<port>/<index_pattern>/_bulk`
+- **Local + SSL** (when `authorization: true` with local): `https://localhost:<port>/<index_pattern>/_bulk`
+- **Remote mode**: `<webhookURL>:<port>/<index_pattern>/_bulk` (HTTP or HTTPS depending on `useSSL`)
+
+Request details:
+
+- **Method**: `POST`
+- **Content-Type**: `application/x-ndjson; charset=UTF-8`
+- **Authorization header** (optional): `Authorization: ApiKey <apiKey>` when `authorization: true`
+
+### NDJSON Structure (per log entry)
+For each log entry, ElasticBuffer writes:
+
+1) Action line: `{"index":{}}`  
+2) Document line: JSON with log fields
+
+Example (one log entry):
+
+```
+{"index":{}}
+{"timestamp":"2024-01-01T12:00:00Z","plugin":"MyPlugin","transactionID":"txn-123","level":"INFO","message":"Player joined","playerName":"Steve","uuid":"f84c6a79-1e3b-4c51-9f2a-0a78b1c6b3e5","serverName":"lobby-01","keyValue":"42.00000","region":"spawn","isVip":true}
+```
+
+### Supported Log Fields
+ElasticBuffer always emits the following base fields:
+
+- `timestamp` – ISO-8601 (UTC) timestamp derived from `System.currentTimeMillis`.
+- `plugin` – Plugin name provided by the caller.
+- `transactionID` – Caller-provided transaction ID; defaults to `"N/A"` when omitted.
+- `level` – Log level string (e.g., `INFO`, `WARNING`, `ERROR`, custom levels as passed).
+- `message` – Log message (quotes are stripped during serialization).
+- `playerName` – Player name when available, otherwise `"N/A"`.
+- `uuid` – Player UUID when available, otherwise `"N/A"`.
+- `serverName` – From config (`serverName`).
+- `keyValue` – Numeric value serialized with 5 decimal places and emitted as a string.
+
+Additional fields can be attached via the `additionalFields` map passed to the API:
+
+- Keys and values are merged into the document JSON.
+- `Number` and `Boolean` values are serialized without quotes.
+- All other values are serialized as strings (with quotes stripped).
+- If `additionalFields` contains a `keyValue` entry and it is numeric, it overrides the explicit `keyValue` argument.
+
+### API Logging Fields (plugin-side)
+When building plugins that log to ElasticBuffer, use these fields consistently:
+
+- **message** (`String`) – primary log text.
+- **level** (`String`) – `INFO`, `WARNING`, `ERROR`, or custom level.
+- **pluginName** (`String`) – name of the emitting plugin.
+- **transactionID** (`String`, optional) – correlates multi-step actions.
+- **playerName** (`String`, optional) – player context.
+- **uuid** (`String`, optional) – player UUID.
+- **keyValue** (`double`, optional) – primary numeric metric.
+- **additionalFields** (`Map<String, Object>`, optional) – custom metadata (e.g., `region`, `isVip`, `actionType`, `latencyMs`).
+
+The API accepts partial payloads; missing values are substituted with `"N/A"` for player data and transaction ID.
+
+### Example Request (raw)
+Below is a full NDJSON request body with two log entries (note the newline delimiters):
+
+```
+{"index":{}}
+{"timestamp":"2024-01-01T12:00:00Z","plugin":"MyPlugin","transactionID":"txn-123","level":"INFO","message":"Player joined","playerName":"Steve","uuid":"f84c6a79-1e3b-4c51-9f2a-0a78b1c6b3e5","serverName":"lobby-01","keyValue":"0.00000","region":"spawn"}
+{"index":{}}
+{"timestamp":"2024-01-01T12:00:05Z","plugin":"MyPlugin","transactionID":"txn-124","level":"WARNING","message":"Suspicious reach detected","playerName":"Steve","uuid":"f84c6a79-1e3b-4c51-9f2a-0a78b1c6b3e5","serverName":"lobby-01","keyValue":"5.80000","checkType":"Reach","severity":3}
+```
+
 ## Anti-Cheat Integration
 - Default checks (`Reach`, `KillAura`, `Velocity`) are registered at startup through `registerDefaultChecks`.
 - Custom checks can be registered by calling `AntiCheatManager.registerCheck` with implementations of `AntiCheatCheck`.
@@ -86,4 +156,3 @@ Internally, the API delegates to `ElasticBuffer.receiveLog`, which stamps timest
 - The plugin registers itself and the API in Bukkit's service manager, so dependent plugins should request the service at runtime rather than keeping static references.
 - When `checkCerts` is false, all SSL certificates are trusted; production deployments should set `checkCerts: true` and configure a truststore.
 - The project uses bStats (plugin ID 23919) for anonymous metrics; outbound network access is required.
-
